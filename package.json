@@ -3,7 +3,7 @@
    "title": "Brackets Sass Hints",
    "author": "Kamil Armatys <armatyskamil@gmail.com> (https://github.com/karmatys)",
    "homepage": "https://github.com/karmatys/brackets-sass",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "engines": { "brackets": ">=1.0.0" },
    "description": "An extension for Brackets to show SASS hints in the code editor.",
    "keywords": ["sass", "scss", "hints"]
