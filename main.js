@@ -21,7 +21,7 @@
  *
  */
 
-/*jshint plusplus: false, devel: true, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
+/*jshint plusplus: false, devel: false, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
 /*global _, define, brackets, $ */
 
 define(function (require, exports, module) {
@@ -242,7 +242,6 @@ define(function (require, exports, module) {
           cursor      = this.crrEditor.getCursorPos();
       
       if(cursor.line !== this.cursorCache.line || cursor.ch < this.cursorCache.ch){
-         console.log("close hints");
          this.crrHintMode = null;
          return false;
       }
@@ -463,8 +462,7 @@ define(function (require, exports, module) {
             
             // read file
             DocumentManager.getDocumentText(file).done(function(text){
-               var hintResult = {},
-                   startTime  = new Date();
+               var hintResult = {};
                
                // remove comments
                text = text.replace(this.commentRegExp, "");
@@ -479,7 +477,6 @@ define(function (require, exports, module) {
                
                // get variables from file
                self.varCache = self.varCache.concat(self._getVariables(hintResult.text, fileName));
-               console.log("Czas przetwarzania pliku " +fileName+": "+ (new Date().getTime() - startTime.getTime()));
             }).fail(function(){
                console.warn("Can't open file: " + fileName);
             });
