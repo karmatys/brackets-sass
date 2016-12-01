@@ -304,7 +304,7 @@ define(function (require, exports, module) {
       var insertText = hint.data("token"),
           keepHints  = false,
           start      = {line: 0, ch: this.cursorCache.ch},
-          end        = {line: 0, ch: 0};
+          end        = this.crrEditor.getCursorPos();
       
       if(insertText === "include"){
          keepHints   = true;
@@ -317,10 +317,10 @@ define(function (require, exports, module) {
       }
       
       start.line = end.line = this.cursorCache.line;
-      end.ch     = start.ch + insertText.length;
+      insertText = insertText.substr(end.ch - start.ch);
       
       // insert hint to editor
-      this.crrEditor._codeMirror.replaceRange(insertText, start, end);
+      this.crrEditor._codeMirror.replaceRange(insertText, end);
 
       return keepHints;
    };

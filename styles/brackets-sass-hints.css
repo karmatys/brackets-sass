@@ -30,7 +30,6 @@
    background-color: #f0f0f0;
    border: 1px solid rgba(0, 0, 0, 0.7);
    border-radius: 2px;
-   color: #000;
    width: 11px;
    height: 11px;
    float: left;
@@ -43,7 +42,6 @@
 .dark .brackets-sass-hints-type{
    background-color: transparent;
    border: 1px solid rgba(255, 255, 255, 0.4);
-   color: inherit;
    font-weight: normal;
 }
 .brackets-sass-hints-details{
