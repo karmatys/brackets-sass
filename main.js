@@ -272,7 +272,7 @@ define(function (require, exports, module) {
             break;
             
          case this.hintModes.FN:
-            if(implicitChar === " " || implicitChar === ":"){
+            if(implicitChar === " "){
                token = null;
                this.cursorCache.ch += 1;
             }
@@ -317,10 +317,9 @@ define(function (require, exports, module) {
       }
       
       start.line = end.line = this.cursorCache.line;
-      insertText = insertText.substr(end.ch - start.ch);
       
       // insert hint to editor
-      this.crrEditor._codeMirror.replaceRange(insertText, end);
+      this.crrEditor._codeMirror.replaceRange(insertText, start, end);
 
       return keepHints;
    };
