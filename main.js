@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 Kamil Armatys
+ * Copyright (C) 2017 Kamil Armatys
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -36,7 +36,8 @@ define(function (require, exports, module) {
        StringMatch        = brackets.getModule("utils/StringMatch"),
        ExtensionUtils     = brackets.getModule("utils/ExtensionUtils"),
        Async              = brackets.getModule("utils/Async"),
-       PreferencesManager = brackets.getModule("preferences/PreferencesManager");
+       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
+       _                  = brackets.getModule("thirdparty/lodash");
        
    var HintItem = require("HintItem"),
        Strings  = require("i18n!nls/strings");
@@ -114,7 +115,7 @@ define(function (require, exports, module) {
       this.fnLocal  = [];
       
       // sass keywords
-      this.keywords = ["import", "mixin", "extend", "function", "include", "media", "if", "return", "for", "each", "while"];
+      this.keywords = ["import", "mixin", "extend", "function", "include", "media", "if", "return", "for", "each", "else", "while"];
       
       // imported files object
       this.importedFiles = {
@@ -136,7 +137,7 @@ define(function (require, exports, module) {
       this.varRegExp     = /\$([A-Za-z0-9_\-]+):\s*([^\n;]+);/g;
       this.mixRegExp     = /@mixin\s+([A-Za-z0-9\-_]+)\s*(?:\(([^\{\(]*)\))?\s*\{/g;
       this.fnRegExp      = /@function\s+([A-Za-z0-9\-_]+)\s*\(([^\{\(]*)\)\s*\{/g;
-      this.commentRegExp = /(?:\/\*[^]*?\*\/|\/\/[^\n]*)/g;
+      this.commentRegExp = /\/\*[^]*?\*\/|\/\/[^\n]*/g;
       
       // define if new session is required
       this.newSession = false;
@@ -520,7 +521,10 @@ define(function (require, exports, module) {
          return;
       }
       
-      var docText = DocumentManager.getCurrentDocument().getText();
+      var docText = this.crrEditor.document.getText();
+      
+      // remove comments
+      docText = docText.replace(this.commentRegExp, "");
       
       switch(type){
          case this.hintModes.VAR:
@@ -792,5 +796,8 @@ define(function (require, exports, module) {
       
       // add sass object to hint manager
       CodeHintManager.registerHintProvider(hints, fileExtensions, 1);
+      
+      // for unit tests
+      exports.sassHintProvider = hints;
    });
 });
