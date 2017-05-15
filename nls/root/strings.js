@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Kamil Armatys
+ * Copyright (c) 2017 Kamil Armatys
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,5 +24,6 @@
 define({
    DESCRIPTION_SASSHINTS: "Enable/disable Sass code hints",
    DESCRIPTION_MAXHINTS: "Define limit for hint list",
-   DESCRIPTION_COMMON_LIBS: "Select root folder of common sass files, which are imported into sass file within project."
+   DESCRIPTION_COMMON_LIBS: "Select root folder of common sass files, which are imported into sass file within project.",
+   DESCRIPTION_SHOW_BUILT_FNS: "Show built-in sass functions in hint list"
 });

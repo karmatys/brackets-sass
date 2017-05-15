@@ -21,8 +21,8 @@
  *
  */
 
-/*jshint plusplus: false, devel: false, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
-/*global _, define, brackets, $ */
+/*jshint plusplus: false, devel: true, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
+/*global define, brackets, $ */
 
 define(function (require, exports, module) {
    "use strict";
@@ -42,9 +42,13 @@ define(function (require, exports, module) {
    var HintItem = require("HintItem"),
        Strings  = require("i18n!nls/strings");
    
+   // Import built-in sass functions
+   var sassFunctions = JSON.parse(require("text!data/sass-functions.json"));
+   
    // Preferences variables
    var commonLibPath    = "",
        maxHintNumber    = 50,
+       showBuiltFns     = true,
        sassHintsEnabled = true;
    
    // All file extensions that are supported
@@ -66,6 +70,11 @@ define(function (require, exports, module) {
       description: Strings.DESCRIPTION_COMMON_LIBS
    });
    
+   // Show built-in sass functions in hint list
+   PreferencesManager.definePreference("sasscodehints.showBuiltFns", "boolean", true, {
+      description: Strings.DESCRIPTION_SHOW_BUILT_FNS
+   });
+   
    PreferencesManager.on("change", "sasscodehints.maxHints", function(){
       maxHintNumber = parseInt(PreferencesManager.get("sasscodehints.maxHints"));
    });
@@ -74,10 +83,14 @@ define(function (require, exports, module) {
       commonLibPath = PreferencesManager.get("sasscodehints.commonLibs");
    });
    
+   PreferencesManager.on("change", "sasscodehints.showBuiltFns", function(){
+      showBuiltFns = !!PreferencesManager.get("sasscodehints.showBuiltFns");
+   });
+   
    PreferencesManager.on("change", "codehint.SassHint", function(){
       sassHintsEnabled = !!PreferencesManager.get("codehint.SassHint");
    });
-
+   
    /**
     * @constructor
     */
@@ -113,6 +126,9 @@ define(function (require, exports, module) {
       
       // space for local (current file) function list
       this.fnLocal  = [];
+      
+      // sass built-in functions
+      this.builtFns = [];
       
       // sass keywords
       this.keywords = ["import", "mixin", "extend", "function", "include", "media", "if", "return", "for", "each", "else", "while"];
@@ -150,10 +166,19 @@ define(function (require, exports, module) {
     * Prepare object to work. This will be called only once, when instace was created
     */
    SassHint.prototype._init = function(){
+      var self = this;
+      
       // prepare keywords
       this.keywords = this.keywords.map(function(key){
          return new HintItem(key, "keywords", "K");
-      }); 
+      });
+      
+      // prepare built-in sass functions
+      _.forEach(sassFunctions, function(value, key){
+         value.arguments.forEach(function(args){
+            self.builtFns.push(new HintItem(key, "(" + args + ")", "F", "sass"));
+         });
+      });
    };
    
    /**
@@ -161,7 +186,12 @@ define(function (require, exports, module) {
     */
    SassHint.prototype.init = function(){
       // scan current file in search of @import declarations
-      this.scanFiles(DocumentManager.getCurrentDocument());
+      this.scanFiles(this.crrEditor.document);
+      
+      // join built-in functions if needed
+      if(showBuiltFns && !this.fnCache.length){
+         this.fnCache = this.fnCache.concat(this.builtFns);
+      }
    };
    
    /**
@@ -282,7 +312,7 @@ define(function (require, exports, module) {
             break;
       }
       
-      if(hintsResult > maxHintNumber){
+      if(hintsResult.length > maxHintNumber){
          hintsResult = hintsResult.slice(0, maxHintNumber);
       }
       
@@ -432,6 +462,11 @@ define(function (require, exports, module) {
       
       // clear names, to prepare array for store file handlers
       files = [];
+      
+      // join built-in functions if needed
+      if(showBuiltFns){
+         this.fnCache = this.fnCache.concat(this.builtFns);
+      }
       
       Async.doInParallel(this.importedFiles.names, function(fileName){
          var $defer = new $.Deferred();

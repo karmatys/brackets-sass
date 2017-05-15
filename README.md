@@ -18,6 +18,9 @@ Otherwise, the extenion will be disabled.
 **`sasscodehints.maxHints`** *(number)*<br/>
 This value determines maximum length of hint list.
 
+**`sasscodehints.showBuiltFns`** *(boolean)*<br/>
+This value define, whether built-in functions will be shown in hint list or not.
+
 **`sasscodehints.commonLibs`** *(string)*<br/>
 Absolute path to the common "partial" files.<br/>
 When we import files by *@import 'file'* the extension firstly looking for a file in directory relative to edited file. If they not exists, script will continue searching in directory, which was passed by *commonLibs* preference.
