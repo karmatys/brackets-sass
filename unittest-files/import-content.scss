@@ -1,0 +1,16 @@
+/* imported test file */
+
+$globalVar: 10px;
+
+// CONVERT PX TO EM UNIT
+@function pxtoem($px, $parent: 16, $unit: "em"){
+	@if ($px == 0) {@return 0};
+
+	@if($px < 0){
+		$em: abs($px) / $parent;
+		@return #{"-"}(round($em*1000)/1000)#{$unit};
+	}
+
+   $em: $px / $parent;
+	@return (round($em*1000)/1000)#{$unit};
+}

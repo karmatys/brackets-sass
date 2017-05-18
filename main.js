@@ -261,7 +261,7 @@ define(function (require, exports, module) {
    };
    
    /**
-    * Return a list of hints, possibly deferred, for the current editor context
+    * Return a list of hints, for the current editor context
     *
     * @param {string} implicitChar  charCode of the last pressed key
     *
@@ -373,6 +373,7 @@ define(function (require, exports, module) {
       this.varCache      = [];
       this.fnCache       = [];
       this.mixCache      = [];
+      this.lastHintMode  = null;
    };
    
    /**
@@ -518,7 +519,7 @@ define(function (require, exports, module) {
          }).fail(function(fileName){
             console.warn("Can't find file: " + fileName);
          });
-         
+
          return $defer.promise();
       }).always(function(){
          self.importedFiles.handlers = files;
