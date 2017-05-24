@@ -44,6 +44,13 @@ define(function (require, exports, module) {
           testDocument,
           testEditor;
       
+      /**
+       * Modify brackets preferences and reinit hint provider if test editor exists
+       *
+       * @param {string|Object} name - name of preference if you want to change only one value or object in form {name: value}.
+       *                               the names should be given without prefix "sasscodehints"
+       * @param {string|number|null} value - new value of given preference
+       */
       function setPreference(name, value){
          if(typeof name === "string"){
             PreferencesManager.set("sasscodehints." + name, value);
@@ -66,12 +73,26 @@ define(function (require, exports, module) {
       /**
        * Set cursor position in current editor. If line number is negative, function will set line from the end
        * 
-       * @param {number} line - editor line (index start at 0)
-       * @param {number} ch - character position (index start at 0)
+       * @param {number} line - editor line (index start at 1)
+       * @param {number} ch - character position (index start at 1)
        */
       function setCursorPos(line, ch){
-         line = (line < 0) ? testEditor.getLastVisibleLine() + line : line;
-         testEditor.setCursorPos({"line": line, "ch": ch || 0});
+         ch   = ch || 1;
+         line = (line < 0) ? testEditor.getLastVisibleLine() + line + 1 : line - 1;
+         testEditor.setCursorPos({"line": line, "ch": ch-1});
+      }
+      
+      /**
+       * Insert text into document
+       *
+       * @param {string} text - text to insert
+       * @param {number} line - editor line (index start at 1)
+       * @param {number} ch - character position (index start at 1)
+      */
+      function insertText(text, line, ch){
+         ch = ch || 1;
+         line = (line < 0) ? testEditor.getLastVisibleLine() + line + 1 : line - 1;
+         testDocument.replaceRange(text, {"line": line, ch: ch-1});
       }
       
       /**
@@ -154,6 +175,41 @@ define(function (require, exports, module) {
          });
       }
       
+      /**
+       * Expect that elements from list are absent in hint response object
+       * 
+       * @param {SassHint} provider - a CodeHintProvider object.
+       * @param {string} key - optional, determine type of hint list (variables, functions, ect.)
+       * @param {Array<string>} list - a list of hint that are absent in hint result
+       */
+      function notIncludeHints(provider, key, list){
+         var hintList = getHints(provider, key);
+         if(typeof hintList === "undefined") return false;
+
+         list.forEach(function(value){
+            expect(_indexOf(hintList, value)).toBe(-1);
+         });
+      }
+      
+      /**
+       * Check performance for given function
+       *
+       * @param {number}   iteration - number of iterations
+       * @param {Function} fn - function to test
+       *
+       * @return {number} - elapsed time (in miliseconds)
+      */
+      function performanceTest(iteration, fn){
+         var start, i;
+         
+         start = new Date().getTime();
+         for(i=0; i<iteration; i++){
+            fn();
+         }
+         
+         return (new Date().getTime() - start);
+      }
+      
       describe("SassHint instance", function(){
          it("built-in functions included successfully", function(){
             expect(SassHint.sassHintProvider.builtFns.length).toBe(78);
@@ -178,7 +234,7 @@ define(function (require, exports, module) {
             testEditor   = mock.editor;
             
             // insert @import
-            testDocument.replaceRange("@import 'import-content.scss';\n", {line: 1, ch:0});
+            insertText("@import 'import-content.scss';\n", 4);
             
             // emulate activeEditorChange event async
             runs(function(){
@@ -187,8 +243,12 @@ define(function (require, exports, module) {
                SassHint.sassHintProvider.init();
                
                // wait for document loading
-               setTimeout(function(){
-                  complete = true;
+               setTimeout(function loadingDone(){
+                  if(SassHint.sassHintProvider.importedFiles.handlers.length > 0){
+                     complete = true;
+                  }
+                  
+                  setTimeout(loadingDone, 50);
                }, 50);
             });
             
@@ -207,14 +267,15 @@ define(function (require, exports, module) {
             expect(getHints(SassHint.sassHintProvider, "$").length).toBe(5);
          });
          
-         it("should display all functions without built-ins [global 3][imported 1]", function(){
+         it("should display all functions without built-ins [global 6][imported 1]", function(){
             setCursorPos(-1, 0);
-            expect(getHints(SassHint.sassHintProvider, ":").length).toBe(4);
+            expect(getHints(SassHint.sassHintProvider, ":").length).toBe(7);
          });
          
          it("should display imported function", function(){
             testDocument.replaceRange(": pxto", {line: 8, ch: 0});
-            setCursorPos(8, 6);
+            insertText(": pxto", -3, 4);
+            setCursorPos(-3, 10);
             includeHints(SassHint.sassHintProvider, null, ["pxtoem"]);
          });
          
@@ -241,13 +302,13 @@ define(function (require, exports, module) {
          });
          
          it("should display all global variables [4]", function(){
-            setCursorPos(-1, 0);
+            setCursorPos(-1);
             expect(getHints(SassHint.sassHintProvider, "$").length).toBe(4);
          });
          
          it("should display all global mixins [3]", function(){
-            testDocument.replaceRange("@include ", {line: 1, ch: 0});
-            setCursorPos(1, 9);
+            insertText("@include ", 10);
+            setCursorPos(10, 10);
             
             // switch from keywords hint to mixin
             getHints(SassHint.sassHintProvider, null);
@@ -257,31 +318,45 @@ define(function (require, exports, module) {
          });
          
          it("should display filtered mixin without switch from keywords mode", function(){
-            setCursorPos(62, 17);
+            setCursorPos(77, 18);
             equalHints(SassHint.sassHintProvider, null, ["clearfix"]);
          });
          
          it("should not display any hints", function(){
-            testDocument.replaceRange("c", {line: 8, ch: 0});
-            setCursorPos(8, 1);
+            insertText("c", 10);
+            setCursorPos(10, 2);
             expectNoHints(SassHint.sassHintProvider, null);
          });
          
          it("should not display any VARIABLE hints", function(){
-            testDocument.replaceRange("$cc", {line: 8, ch: 0});
-            setCursorPos(8, 3);
+            insertText("$cc", 10);
+            setCursorPos(10, 4);
+            
+            // hasHint should return true, but getHints should not match anything
             expect(getHints(SassHint.sassHintProvider, null).length).toBe(0);
          });
          
-         xit("should display parametrs and local variables", function(){
-            testDocument.replaceRange("$\n", {line: 15, ch: 3});
-            setCursorPos(15, 3);
+         it("should not display VARIABLE defined inside comment, even if cursor is inside it", function(){
+            setCursorPos(72, 4);
+            
+            // hasHint should return true, but getHints should not match anything
+            notIncludeHints(SassHint.sassHintProvider, "$", ["black"]);
+         });
+         
+         it("should display parametrs and local variables", function(){
+            insertText("$\n", 17, 4);
+            setCursorPos(17, 5);
             includeHints(SassHint.sassHintProvider, null, ["a", "b", "c", "result"]);
          });
          
+         it("should display parametrs inside inline function", function(){
+            setCursorPos(28, 38);
+            includeHints(SassHint.sassHintProvider, "$", ["a", "b"]);
+         });
+         
          it("should filter variable hints by query", function(){
-            testDocument.replaceRange("$s", {line: 8, ch: 0});
-            setCursorPos(8, 2);
+            insertText("$s", 10);
+            setCursorPos(10, 3);
             equalHints(SassHint.sassHintProvider, null, ["sizeA", "sizeB"]);
          });
          
@@ -300,7 +375,7 @@ define(function (require, exports, module) {
             setPreference("showBuiltFns", false);
             setCursorPos(-1, 0);
             
-            expect(getHints(SassHint.sassHintProvider, ":").length).toBe(3);
+            expect(getHints(SassHint.sassHintProvider, ":").length).toBe(6);
             setPreference("showBuiltFns", true);
          });
          

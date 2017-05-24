@@ -1,5 +1,7 @@
-/* test content */
-   
+/** 
+ * @test content 
+*/
+
 /* global vars */
 $white: #fff;
 $red: #f00;
@@ -11,7 +13,7 @@ $sizeB: 10em;
    @return $a+$b;
 }
 
-@function multiple ($a, $b, $c){
+@function multiple ($a, $b, $c: 5px){
    $result: $a * $b * $c;
    @return $result;
 }
@@ -19,6 +21,18 @@ $sizeB: 10em;
 {
    $res: $a/$b;
    @return $res;
+}
+
+@function inlineFunction () { @return null; }
+
+@function inlineWithParams ($a, $b) { @return null; }
+
+@function multiLineStrangeFn 
+   ()
+{
+   $localA: 5px;
+   $localB: 10px;
+   @return $localA + $localB;
 }
 
 /* mixins */
@@ -55,10 +69,11 @@ $sizeB: 10em;
 /*
  $black: #000;
  @function excludedFunction(){
- }
+ } 
 */
 
 body{
    background-color: $white;
    @include clearfix;
+   
 }
