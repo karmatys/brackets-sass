@@ -92,17 +92,16 @@ define(function (require, exports, module) {
    });
    
    /**
+    * Priority sort function for multiFieldSort method
+   */
+   function prioritySort(a, b){
+      return b.priority - a.priority;
+   }
+   
+   /**
     * @constructor
     */
    function SassHint() {
-      
-      // const hint modes
-      this.hintModes = Object.freeze({
-         "VAR": 0,
-         "FN":  1,
-         "KEY": 2,
-         "MIX": 3
-      });
       
       // reference to current session editor
       this.crrEditor = null;
@@ -118,14 +117,14 @@ define(function (require, exports, module) {
       // space for function list
       this.fnCache = [];
       
-      // space for local (current file) variable list
-      this.varLocal = [];
+      // space for local and global variable list from current edited file
+      this.vars = [];
       
-      // space for local (current file) mixin list
-      this.mixLocal = [];
+      // space for global mixin list from current edited file
+      this.mixins = [];
       
-      // space for local (current file) function list
-      this.fnLocal  = [];
+      // space for global function list from current edited file
+      this.functions  = [];
       
       // sass built-in functions
       this.builtFns = [];
@@ -140,9 +139,9 @@ define(function (require, exports, module) {
       };
       
       this.triggerHints = {
-         "$": this.hintModes.VAR, // start hinting session for variables
-         "@": this.hintModes.KEY, // start hinting session for sass keywords
-         ":": this.hintModes.FN   // start hinting session for functions
+         "$": SassHint.hintModes.VAR, // start hinting session for variables
+         "@": SassHint.hintModes.KEY, // start hinting session for sass keywords
+         ":": SassHint.hintModes.FN   // start hinting session for functions
       };
       
       // define what is currently searched
@@ -153,7 +152,7 @@ define(function (require, exports, module) {
       this.varRegExp     = /\$([A-Za-z0-9_\-]+):\s*([^\n;]+);/g;
       this.mixRegExp     = /@mixin\s+([A-Za-z0-9\-_]+)\s*(?:\(([^\{\(]*)\))?\s*\{/g;
       this.fnRegExp      = /@function\s+([A-Za-z0-9\-_]+)\s*\(([^\{\(]*)\)\s*\{/g;
-      this.commentRegExp = /\/\*[^]*?\*\/|\/\/[^\n]*/g;
+      this.commentRegExp = /\/\*[^]*?(?:\*\/|$)|\/\/[^\n]*/g;
       
       // define if new session is required
       this.newSession = false;
@@ -161,6 +160,14 @@ define(function (require, exports, module) {
       // prepare some properties
       this._init();
    }
+   
+   // const hint modes
+   SassHint.hintModes = Object.freeze({
+      "VAR": 0,
+      "FN":  1,
+      "KEY": 2,
+      "MIX": 3
+   });
    
    /**
     * Prepare object to work. This will be called only once, when instace was created
@@ -170,7 +177,7 @@ define(function (require, exports, module) {
       
       // prepare keywords
       this.keywords = this.keywords.map(function(key){
-         return new HintItem(key, "keywords", "K");
+         return new HintItem(key, "", "K", "keyword");
       });
       
       // prepare built-in sass functions
@@ -210,7 +217,7 @@ define(function (require, exports, module) {
 
          // hint mode was changed in previous session
          if(this.crrHintMode !== null && this.newSession){
-            this._getLocalHints({line: -1}, this.crrHintMode);
+            this._updateHints({line: -1}, this.crrHintMode);
             this.cursorCache = cursor;
             this.newSession  = false;
             return true;
@@ -229,13 +236,13 @@ define(function (require, exports, module) {
             startChar = match[2].length;
             
             // mixins and keywords have the same trigger symbol @, so we must distinguish @include from other keywords
-            this.crrHintMode = (match[1] === "@include") ? this.hintModes.MIX : this.hintModes.FN;
+            this.crrHintMode = (match[1] === "@include") ? SassHint.hintModes.MIX : SassHint.hintModes.FN;
          } else {
             startChar = match[0].length-1;
             this.crrHintMode = this.triggerHints[match[1].charAt(0)];
          }
          
-         this._getLocalHints(cursor, this.crrHintMode);
+         this._updateHints(cursor, this.crrHintMode);
          
          this.cursorCache     = cursor;
          this.cursorCache.ch -= startChar;
@@ -248,7 +255,7 @@ define(function (require, exports, module) {
          var cursor = editor.getCursorPos();
          this.crrHintMode = this.triggerHints[implicitChar];
          
-         this._getLocalHints(cursor, this.crrHintMode);
+         this._updateHints(cursor, this.crrHintMode);
          
          this.cursorCache = cursor;
          this.crrEditor   = editor;
@@ -281,34 +288,34 @@ define(function (require, exports, module) {
       token = this._getToken(cursor);
       
       switch(this.crrHintMode){
-         case this.hintModes.VAR:
-            hintsResult = this._matchHints(this.varLocal, token);
+         case SassHint.hintModes.VAR:
+            hintsResult = this._matchHints(this.vars, token);
             break;
          
-         case this.hintModes.KEY:
+         case SassHint.hintModes.KEY:
             if(token === "include "){
-              this.crrHintMode = this.hintModes.MIX;
+              this.crrHintMode = SassHint.hintModes.MIX;
               return this.newSession = true;
             }
             hintsResult = this._matchHints(this.keywords, token);
             break;
          
-         case this.hintModes.MIX:
+         case SassHint.hintModes.MIX:
             if(implicitChar === " "){
                token = null;
                this.cursorCache.ch += 1;
             }
             
-            hintsResult = this._matchHints(this.mixLocal, token);
+            hintsResult = this._matchHints(this.mixins, token);
             break;
             
-         case this.hintModes.FN:
+         case SassHint.hintModes.FN:
             if(implicitChar === " "){
                token = null;
                this.cursorCache.ch += 1;
             }
             
-            hintsResult = this._matchHints(this.fnLocal, token);
+            hintsResult = this._matchHints(this.functions, token);
             break;
       }
       
@@ -341,7 +348,7 @@ define(function (require, exports, module) {
          keepHints   = true;
          insertText += " ";
          
-         this.crrHintMode = this.hintModes.MIX;
+         this.crrHintMode = SassHint.hintModes.MIX;
          this.newSession  = keepHints = true;
       } else {
          this.crrHintMode = null;
@@ -397,7 +404,7 @@ define(function (require, exports, module) {
     * @return {Array}  Formatted hint list
     */
    SassHint.prototype._formatHints = function(hints){
-      StringMatch.multiFieldSort(hints, { matchGoodness: 0, name: 1 });
+      StringMatch.multiFieldSort(hints, ["matchGoodness", prioritySort, "name"]);
       
       return hints.map(function(hint){
          return hint.toHTML();
@@ -461,7 +468,7 @@ define(function (require, exports, module) {
       // store imported file names
       this.importedFiles.names = files;
       
-      // clear names, to prepare array for store file handlers
+      // clear names, prepare array for store file handlers
       files = [];
       
       // join built-in functions if needed
@@ -552,27 +559,34 @@ define(function (require, exports, module) {
     * @param {Object} cursor  Last cursor position
     * @param {number} type    Which group will be updated (recommended pass by hintModes const object)
     */
-   SassHint.prototype._getLocalHints = function(cursor, type){
+   SassHint.prototype._updateHints = function(cursor, type){
       if(cursor.line === this.cursorCache.line && this.lastHintMode === type){
          return;
       }
       
-      var docText = this.crrEditor.document.getText();
-      
-      // remove comments
-      docText = docText.replace(this.commentRegExp, "");
+      var source;
       
       switch(type){
-         case this.hintModes.VAR:
-            // we have to clear local/private variables
-            docText       = this._clearBlocks(docText);
-            this.varLocal = this.varCache.concat(this._getVariables(docText));
+         case SassHint.hintModes.VAR:
+            // find local/private variables
+            source = this._getLocalVariables(this.crrEditor, cursor, true);
+            
+            // join local and global variables
+            this.vars = this.varCache.concat(source.vars, this._getVariables(source.text));
             break;
-         case this.hintModes.MIX:
-            this.mixLocal = this.mixCache.concat(this._getMixins(docText).hints);
+         case SassHint.hintModes.MIX:
+            // get global mixins
+            source = this._removeComments(this.crrEditor.document.getText(), false);
+            
+            // join with cached mixins
+            this.mixins = this.mixCache.concat(this._getMixins(source).hints);
             break;
-         case this.hintModes.FN:
-            this.fnLocal = this.fnCache.concat(this._getFunctions(docText).hints);
+         case SassHint.hintModes.FN:
+            // get global functions from current editor
+            source = this._removeComments(this.crrEditor.document.getText(), false);
+            
+            // join with cached functions
+            this.functions = this.fnCache.concat(this._getFunctions(source).hints);
             break;
       }
       
@@ -665,21 +679,180 @@ define(function (require, exports, module) {
    };
    
    /**
+    * Analyze document for search local variables based on cursor position
+    *
+    * @param {Editor}  editor        The current editor context
+    * @param {Object}  cursor        Cursor position
+    * @param {boolean} overrideText  Optional. If true, it will return input text without any block definitions (works like _clearBlocks), 
+    *                                otherwise return original text. Default false
+    *
+    * @return {Object} Local variables and processed input text
+    */
+   SassHint.prototype._getLocalVariables = function(editor, cursor, overrideText){
+      var targetExp  = /@(?:mixin|function)\s+(?:[^\{]*)\s*\{/g,
+          match      = [],
+          localVars  = [],
+          curFlatPos = 0,
+          docText    = "";
+      
+      var blockCoords = [],
+          blockBody   = "",
+          block       = {};
+      
+      // helper vars
+      var endIdx = 0,
+          i      = 0;
+      
+      // cast optional param to bool
+      overrideText = !!overrideText;
+      
+      // get "flat" cursor position
+      docText    = this._removeComments(editor.document.getRange({line: 0, ch: 0}, cursor), false);
+      curFlatPos = docText.length;
+      
+      // join rest of document
+      endIdx   = editor.getLastVisibleLine();
+      docText += this._removeComments(editor.document.getRange(cursor, {line: endIdx}), false);
+      
+      // find all mixins and functions coordinates
+      while((match = targetExp.exec(docText)) !== null){
+         block = {
+            head:  match.index,
+            start: match.index + match[0].length,
+            end:   this._findCloseBracket(docText, match.index)
+         };
+         
+         if(curFlatPos >= block.start && curFlatPos <= block.end){
+            blockBody = docText.substring(block.head, block.end);
+            endIdx    = i;
+         }
+         
+         blockCoords.push(block);
+         i++;
+      }
+      
+      // get local variable if cursor is inside the block
+      if(blockBody){
+         localVars = this._findLocalVariables(blockBody, {
+            head:  0,
+            start: blockCoords[endIdx].start - blockCoords[endIdx].head,
+            end:   blockCoords[endIdx].end - blockCoords[endIdx].head
+         }, curFlatPos - blockCoords[endIdx].start);
+      }
+      
+      // remove block definitions if needed
+      if(overrideText && blockCoords.length > 0){
+         // offset does not be calculated for first element
+         docText = this._stringReplaceRange(docText, blockCoords[0].head, blockCoords[0].end, "");
+         endIdx  = blockCoords[0].end - blockCoords[0].head;
+         
+         for(i = 1; i< blockCoords.length; i++){
+            // need update block coordinates, after remove first part of text
+            docText  = this._stringReplaceRange(docText, blockCoords[i].head - endIdx, blockCoords[i].end - endIdx, "");
+            endIdx  += blockCoords[i].end - blockCoords[i].head;
+         }
+      }
+      
+      return {
+         text: docText,
+         vars: localVars
+      };
+   };
+   
+   /**
+    * Find parameters and variables in local scope
+    *
+    * @param {string}  text         Input text (block body)
+    * @param {Object}  localCoords  Coordinates that indicates on function/mixin definition. Values should be related to 
+    *                               input text what means shift from global to local scope
+    * @param {number}  localCursor  Optional. "Flat" cursor position (without division on lines). Default 0
+    *
+    * @return {Array<HintItem>} Unique local variables and parameters
+    */
+   SassHint.prototype._findLocalVariables = function(text, localCoords, localCursor){
+      var argsExp = /\$([\w\-]+)(?::[\t ]*([^,\)\s]+))?/g,
+          args    = [],
+          vars    = [],
+          params  = {};
+      
+      var def     = "",
+          key     = "",
+          vkey    = "",
+          hintObj;
+      
+      localCursor = localCursor || 0;
+      
+      // get function/mixin definition
+      def = text.substring(localCoords.head, localCoords.start);
+      
+      // find parameters
+      while((args = argsExp.exec(def)) !== null){
+         hintObj = new HintItem(args[1], "", "P", "local");
+         hintObj.setPriority(HintItem.priorities.high);
+         
+         if(args[2]){
+            hintObj.setDetails(args[2]);
+         }
+         
+         params[args[1]] = hintObj;
+      }
+      
+      vars = this._getVariables(text, "local", HintItem.priorities.medium, true);
+      
+      // join unique variables from body
+      for(key in params){
+         vkey = key + "local";
+         if(vars.hasOwnProperty(vkey)){
+            params[key].setDetails(vars[vkey].getDetails());
+            delete vars[vkey];
+         } 
+         
+         vars[key] = params[key];
+      }
+      
+      return _.values(vars);
+   };
+   
+   /**
+    * Remove all comments from given text
+    *
+    * @param {string}  text       Input text
+    * @param {boolean} keepLines  Optional. When true, comments will be replaced by new line character, 
+    *                             thus number of lines in editor will not change. Default false
+    *
+    * @return {string} Text without any comments (inline or multiline)
+    */
+   SassHint.prototype._removeComments = function(text, keepLines){
+      return (!!keepLines === false) ? 
+         text.replace(this.commentRegExp, "") :
+         text.replace(this.commentRegExp, function(fullMatch){
+            // single-line comment
+            if(fullMatch.charAt(1) === "/") return "";
+            
+            // multi-line comment
+            return "\n".repeat(fullMatch.split("\n").length-1);
+         });
+   };
+   
+   /**
     * Get variables from text. Because SASS allow "redefine" variable we must ensure that we have only one definition 
     * of variable in hints result
     *
-    * @param {string} text     Input text
-    * @param {string} context  Optional. Name of file. Default local
+    * @param {string}  text            Input text
+    * @param {string}  context         Optional. Name of file. Default global
+    * @param {number}  priority        Optional. Priority for hints. This affects on display order. Default low (0)
+    * @param {boolean} returnAsObject  Optional. When true, object will not be converted to simple array. Default false
     *
-    * @return {Array<HintItem>}  List of uniques variable definitions
+    * @return {Array<HintItem>|Object} List of uniques variable definitions
     */
-   SassHint.prototype._getVariables = function(text, context){
+   SassHint.prototype._getVariables = function(text, context, priority, returnAsObject){
       var match  = [],
           result = {}, // store in object to prevent duplicate variables
           key    = "";
       
       // set param default value
-      context = context || "local";
+      context  = context || "global";
+      priority = priority || 0;
       
       while((match = this.varRegExp.exec(text)) !== null){
          key = match[1] + context;
@@ -689,10 +862,11 @@ define(function (require, exports, module) {
             result[key].setDetails(match[2]);
          } else {
             result[key] = new HintItem(match[1], match[2], 'V', context);
+            result[key].setPriority(priority);
          }
       }
 
-      return _.values(result);
+      return (!!returnAsObject) ? result : _.values(result);
    };
    
    /**
@@ -701,7 +875,7 @@ define(function (require, exports, module) {
     * @param {string}  text          Input text
     * @param {string}  context       Optional. Name of file. Default local
     * @param {boolean} overrideText  Optional. If true, it will return input text without mixin definitions (like _clearBlocks), 
-    *                               otherwise return original text. Default false
+    *                                otherwise return original text. Default false
     *
     * @return {Object}  List of uniques mixin definitions (hints) and processed or original text (text)
     */
@@ -711,7 +885,7 @@ define(function (require, exports, module) {
           endIdx = 0,
           hint;
       
-      context      = context || "local";
+      context      = context || "global";
       overrideText = !!overrideText;
       
       // search mixins
@@ -745,7 +919,7 @@ define(function (require, exports, module) {
     * @param {string}  text          Input text
     * @param {string}  context       Optional. Name of file. Default local
     * @param {boolean} overrideText  Optional. If true, it will return input text without function definitions (like _clearBlocks), 
-    *                               otherwise return original text. Default false
+    *                                otherwise return original text. Default false
     *
     * @return {Object}  List of uniques function definitions (hints) and processed or original text (text)
     */
@@ -755,7 +929,7 @@ define(function (require, exports, module) {
           endIdx    = 0,
           hint;
       
-      context  = context || "local";
+      context  = context || "global";
       overrideText = !!overrideText;
       
       // search functions

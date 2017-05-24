@@ -41,16 +41,24 @@ define(function (require, exports, module) {
       
       this.color = this.isColor();
       
+      this.priority      = 0;
       this.matchGoodness = 0;
       this.stringRanges  = null;
    }
+   
+   // const hint item priorities
+   HintItem.priorities = Object.freeze({
+      low:    0,
+      medium: 1,
+      high:   2
+   });
    
    HintItem.prototype.getName = function(){
       return this.name;
    };
    
    HintItem.prototype.getDetails = function(){
-      return this.value;
+      return this.details;
    };
    
    HintItem.prototype.setDetails = function(value){
@@ -64,6 +72,14 @@ define(function (require, exports, module) {
    
    HintItem.prototype.getType = function(){
       return this.type;
+   };
+   
+   HintItem.prototype.setPriority = function(value){
+      this.priority = value;
+   };
+   
+   HintItem.prototype.getPriority = function(){
+      return this.priority;
    };
    
    HintItem.prototype.setParams = function(text){
@@ -82,6 +98,10 @@ define(function (require, exports, module) {
          ColorUtils.formatColorHint($hintObj, this.details);
       } else {
          $hintObj.append($("<span>").text(this.type).addClass("brackets-sass-hints-type"));
+      }
+      
+      if(this.priority === HintItem.priorities.high){
+         $hintObj.addClass('priority-high');
       }
       
       // highlight the matched portion of each hint
