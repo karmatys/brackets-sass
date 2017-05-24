@@ -610,46 +610,31 @@ define(function (require, exports, module) {
    /**
     * Find last close curly bracket "}" in text. Utility tools for get all function definition.
     *
-    * @param {string|Array} text           The string to search for
-    * @param {number}       startPosition  Optional. Offset
-    * @param {boolean}      multiline      Optional. Split text to multiline
+    * @param {string}  text           The string to search for
+    * @param {number}  startPosition  Optional. Offset
     *
     * @return {number} Position of bracket in text
     */
-   SassHint.prototype._findCloseBracket = function(text, startPosition, multiline){
+   SassHint.prototype._findCloseBracket = function(text, startPosition){
       var openBrackets = 0,
           bracketsExp  = /[{}]/g,
-          matched      = null,
-          lines        = 0;
+          matched      = null;
 
       startPosition = parseInt(startPosition) || 0;
-      multiline     = typeof multiline === "undefined" ? true : multiline;
       
       if(startPosition > 0 && typeof text === "string"){
          text = text.substr(startPosition);
       }
       
-      if(!Array.isArray(text)){
-         text = multiline ? text.split("\n") : [text];
-      }
-
-      // get length
-      lines = text.length;
-
-      for(var i = 0; i < lines; i++){
-         while((matched = bracketsExp.exec(text[i])) !== null){
-            if(matched[0] === "{"){
-               openBrackets++;
-               continue;
-            }
-
-            if(--openBrackets === 0){
-               // one line function
-               return i === 0 ? (startPosition + matched.index + 1) : (startPosition + text[i].length + i - matched.index);
-            } 
+      while((matched = bracketsExp.exec(text)) !== null){
+         if(matched[0] === "{"){
+            openBrackets++;
+            continue;
          }
 
-         startPosition += text[i].length;
+         if(--openBrackets === 0){
+            return startPosition + matched.index + 1;
+         } 
       }
 
       return startPosition;
@@ -696,12 +681,10 @@ define(function (require, exports, module) {
           docText    = "";
       
       var blockCoords = [],
-          blockBody   = "",
           block       = {};
       
       // helper vars
-      var endIdx = 0,
-          i      = 0;
+      var endIdx = 0;
       
       // cast optional param to bool
       overrideText = !!overrideText;
@@ -722,41 +705,68 @@ define(function (require, exports, module) {
             end:   this._findCloseBracket(docText, match.index)
          };
          
-         if(curFlatPos >= block.start && curFlatPos <= block.end){
-            blockBody = docText.substring(block.head, block.end);
-            endIdx    = i;
-         }
-         
          blockCoords.push(block);
-         i++;
       }
       
       // get local variable if cursor is inside the block
-      if(blockBody){
+      if((endIdx = this._inBlock(blockCoords, curFlatPos)) !== -1){
+         var blockBody = docText.substring(blockCoords[endIdx].head, blockCoords[endIdx].end);
+         
          localVars = this._findLocalVariables(blockBody, {
             head:  0,
             start: blockCoords[endIdx].start - blockCoords[endIdx].head,
             end:   blockCoords[endIdx].end - blockCoords[endIdx].head
          }, curFlatPos - blockCoords[endIdx].start);
       }
-      
+
       // remove block definitions if needed
       if(overrideText && blockCoords.length > 0){
          // offset does not be calculated for first element
          docText = this._stringReplaceRange(docText, blockCoords[0].head, blockCoords[0].end, "");
          endIdx  = blockCoords[0].end - blockCoords[0].head;
          
-         for(i = 1; i< blockCoords.length; i++){
+         for(var i = 1; i< blockCoords.length; i++){
             // need update block coordinates, after remove first part of text
             docText  = this._stringReplaceRange(docText, blockCoords[i].head - endIdx, blockCoords[i].end - endIdx, "");
             endIdx  += blockCoords[i].end - blockCoords[i].head;
          }
       }
-      
+
       return {
          text: docText,
          vars: localVars
       };
+   };
+   
+   /**
+    * Indicates whether cursor is inside the block (function/mixin) or not. If yes, it return its index to block definition, otherwise 
+    * return -1. This method is based on binary search.
+    *
+    * @param {Array<Object>} coords - coordinates to all blocks (functions/mixins) in document
+    * @param {number} cursorPos - cursor position
+    *
+    * @return {number} - index position or -1
+   */
+   SassHint.prototype._inBlock = function(coords, cursorPos){
+      var left   = 0, 
+          middle = 0,
+          right  = coords.length-1;
+      
+      while(left <= right){
+         middle = (left+right) >> 1;
+         
+         if(cursorPos >= coords[middle].start && cursorPos <= coords[middle].end){
+            return middle;
+         }
+         
+         if(coords[middle].start < cursorPos){
+            left = middle + 1;
+         }else{
+            right = middle - 1;
+         }
+      }
+      
+      return -1;
    };
    
    /**
@@ -823,7 +833,7 @@ define(function (require, exports, module) {
     * @return {string} Text without any comments (inline or multiline)
     */
    SassHint.prototype._removeComments = function(text, keepLines){
-      return (!!keepLines === false) ? 
+      return (keepLines === false) ? 
          text.replace(this.commentRegExp, "") :
          text.replace(this.commentRegExp, function(fullMatch){
             // single-line comment

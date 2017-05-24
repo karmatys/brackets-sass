@@ -30,7 +30,7 @@ For more information on setting preferences see [How to Use Brackets - Preferenc
 ### Planned development
 
 1. Functions / Mixins paramenter hints
-2. Local variables and argument hints within function / mixin body
+2. Jump to definition
 
 ### License
 MIT-licensed -- see `main.js` for details.
