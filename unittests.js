@@ -201,18 +201,61 @@ define(function (require, exports, module) {
       */
       function performanceTest(iteration, fn){
          var start, i;
-         
-         start = new Date().getTime();
+
+         start = performance.now();
          for(i=0; i<iteration; i++){
             fn();
          }
-         
-         return (new Date().getTime() - start);
+
+         return (performance.now() - start);
       }
       
       describe("SassHint instance", function(){
+         var sass, text;
+
+         beforeFirst(function(){
+            // create dummy editor
+            mock = SpecRunnerUtils.createMockEditor(testContent, "scss");
+            testDocument = mock.doc;
+            testEditor   = mock.editor;
+
+            // create shortcuts
+            sass = SassHint.sassHintProvider;
+            text = testDocument.getText();
+
+            // emulate activeEditorChange event
+            SassHint.sassHintProvider.clearCache();
+            SassHint.sassHintProvider.setEditor(testEditor);
+            SassHint.sassHintProvider.init();
+         });
+
+         afterLast(function(){
+            // destroy editor
+            SpecRunnerUtils.destroyMockEditor(testDocument);
+            testEditor   = null;
+            testDocument = null;
+         });
+
          it("built-in functions included successfully", function(){
             expect(SassHint.sassHintProvider.builtFns.length).toBe(78);
+         });
+
+         it("method _findCloseBrackets work successfully", function(){
+            var startAt = testEditor.indexFromPos({line: 15, ch: 0}),
+                endAt   = testEditor.indexFromPos({line: 18, ch: 1});
+
+            // multiline function
+            expect(sass._findCloseBracket(text, startAt)).toBe(endAt);
+
+            // inline function
+            startAt = testEditor.indexFromPos({line: 27, ch: 0});
+            endAt   = testEditor.indexFromPos({line: 27, ch: 53});
+            expect(sass._findCloseBracket(text, startAt)).toBe(endAt);
+
+            // mixin
+            startAt = testEditor.indexFromPos({line: 54, ch: 0});
+            endAt   = testEditor.indexFromPos({line: 65, ch: 1});
+            expect(sass._findCloseBracket(text, startAt)).toBe(endAt);
          });
       });
       
