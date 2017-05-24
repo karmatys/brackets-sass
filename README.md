@@ -36,4 +36,4 @@ For more information on setting preferences see [How to Use Brackets - Preferenc
 MIT-licensed -- see `main.js` for details.
 
 ### Compatibility
-Tested on Brackets Release 1.7 (Windows 7).
+Tested on Brackets Release 1.9 (Windows 7).
