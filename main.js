@@ -174,7 +174,7 @@ define(function (require, exports, module) {
    });
    
    /**
-    * Prepare object to work. This will be called only once, when instace was created
+    * Prepare object to work. This will be called only once, when instance will be created
     */
    SassHint.prototype._init = function(){
       var self = this;
@@ -413,7 +413,12 @@ define(function (require, exports, module) {
    };
    
    /**
+    * Provides specific data for parameters hint
     *
+    * @param {string} token  Prepared fragment text which allow recognize function/mixin call
+    *
+    * @return {Object|boolean} False if given token is not recognized as a function (or mixin) or returns object 
+    *                          with name and function/mixin hint array list
    */
    SassHint.prototype.getHintDataByParameterToken = function(token){
       var match = /(?:@include )?\b([a-zA-Z0-9_\-]+)\($/.exec(token);
@@ -430,12 +435,12 @@ define(function (require, exports, module) {
    };
    
    /**
-    * Insert selected hint that is function or mixin name and automatically open parameter hint session
+    * Insert selected hint that is function (or mixin) name and automatically open parameter hint session
     *
-    * @param {string} hintName -
-    * @param {string} hintDetails - 
-    * @param {Object} start -
-    * @param {Object} end -
+    * @param {string} hintName     hint name
+    * @param {string} hintDetails  hint parameters
+    * @param {Object} start        start cursor position
+    * @param {Object} end          end cursor position
     */
    SassHint.prototype._insertCallable = function(hintName, hintDetails, start, end){
       // insert text to editor
@@ -1096,7 +1101,7 @@ define(function (require, exports, module) {
          hints.init();
       };
       
-      // set function that gives last hint data (functions or mixins) when parameters are requested by cmd
+      // set function that gives last hint data when parameters are requested by cmd
       paramHints.setDataForHintRequest(function(token){
          return hints.getHintDataByParameterToken(token);
       });

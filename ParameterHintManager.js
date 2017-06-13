@@ -67,8 +67,11 @@ define(function (require, exports, module) {
       this._init();
    }
    
+   /**
+    * Prepares object to work. This will be called only once, when instance will be created
+   */
    ParameterHintManager.prototype._init = function(){
-      // prepare handlers from editor
+      // prepare DOM handlers
       this.$hintContainer = $("body").find("#function-hint-container");
       
       if(this.$hintContainer.length < 0){
@@ -77,7 +80,7 @@ define(function (require, exports, module) {
       
       this.$hintContent = this.$hintContainer.children().first();
       
-      // get command
+      // check, if command is defined and associated with the same keys
       crrCmd = KeyBindingManager.getKeymap()[KEY_BINDING];
       if(typeof crrCmd !== "undefined"){
          crrCmdHandler  = CommandManager.get(crrCmd.commandID);
@@ -87,32 +90,64 @@ define(function (require, exports, module) {
       }
    };
    
+   /**
+    * Refreshes instance whenever editor will be changed.
+   */
    ParameterHintManager.prototype.init = function(editor){
       // set editor for events later
       this.editor  = editor;
    };
    
+   /**
+    * Determines, if session hint is active or not
+    *
+    * @return {boolean} true, if parameters hint is active
+   */
    ParameterHintManager.prototype.isActive = function(){
       return this.active;
    };
    
+   /**
+    * Determines, if hint container is visible or not
+    *
+    * @return {boolean} true, if parameters hint is visible
+   */
    ParameterHintManager.prototype.isVisible = function(){
       return this.visible;
    };
    
+   /**
+    * Determines, if command (associated with the same keys) was detected and overridden.
+    * It's possible to restore previous command function by #releaseCommands method
+    *
+    * @return {boolean} true, if command was overridden
+   */
    ParameterHintManager.prototype.isCmdOverridden = function(){
       return typeof crrCmd !== "undefined";
    };
    
+   /**
+    * Defines function which provides data (HintItem array) when parameter hints will be request by command
+    *
+    * @param {function} fn - function which returns data for hint request
+   */
    ParameterHintManager.prototype.setDataForHintRequest = function(fn){
       this.dataHandler = fn;
    };
    
    /**
+    * It create new hinting session and display content in code editor. It can be called in the same session
+    * what causes storing previous hint data in stack and temporary change content to new hint
     *
-    */
+    * @param {string} hintName - function or mixin name
+    * @param {Array<HintItem>|string} hintParams - raw hint parameters or list which will be searched
+    * @param {Object} cursor - current cursor position
+    * @param {string} token - optional. fragment which help to indicate current position in hint content
+    *
+    * @return {boolean} true, if success
+   */
    ParameterHintManager.prototype.openHint = function(hintName, hintParams, cursor, token){
-      // params are not given, we have to find them by hint name
+      // params are not given, we have to find them in array by hint name
       if(Array.isArray(hintParams)){
          hintParams = this._findParams(hintName, hintParams);
          
@@ -120,6 +155,14 @@ define(function (require, exports, module) {
          if(hintParams === -1){
             return false;
          }   
+      }
+      
+      if(this.active){
+         // parameters hint is already open, store current state
+         this._storeHintState();
+      } else{
+         // add listeners
+         this._addListeners();
       }
       
       var hintPos = this.editor._codeMirror.charCoords({line: cursor.line, ch: cursor.ch - 1});
@@ -130,16 +173,20 @@ define(function (require, exports, module) {
       this.hintParams  = (hintParams === "()") ? Strings.NO_ARGUMENTS : hintParams.slice(1, -1).split(",");
       this.token       = token || "";
       
-      // add listeners
-      this._addListeners();
-      
       // show hints
       this._popupHint();
       
       // set position
       this._positionHint(hintPos.left, hintPos.top, hintPos.bottom);
+      
+      return true;
    };
    
+   /**
+    * Dismiss parameters hint from code editor and destroy session
+    *
+    * @return {boolean} true, if success
+   */
    ParameterHintManager.prototype.closeHint = function(){
       if(!this.active) return true;
                             
@@ -147,11 +194,17 @@ define(function (require, exports, module) {
       this.$hintContent.empty();
       this._removeListeners();
       
+      this.hintStack = [];
       this.active = this.visible = false;
       
       return true;
    };
    
+   /**
+    * Show hint container in code editor, if session is active
+    *
+    * @return {boolean} true, if success
+   */
    ParameterHintManager.prototype.showHint = function(){
       if(!this.active && this.visible) return false;
       
@@ -159,6 +212,11 @@ define(function (require, exports, module) {
       return this.visible = true;
    };
    
+   /**
+    * Hide hint container in code editor, but not destroy current session
+    *
+    * @return {boolean} true, if success
+   */
    ParameterHintManager.prototype.hideHint = function(){
       if(!this.active && !this.visible) return false;
       
@@ -167,6 +225,13 @@ define(function (require, exports, module) {
       return true;
    };
    
+   /**
+    * Prepare hint params to display in editor
+    *
+    * @param {Array<string>|string} source - separated parameters or string with "no params" notice
+    *
+    * @return {string} escaped and formated HTML string
+   */
    ParameterHintManager.prototype._formatHints = function(source){
       if(typeof source === "string"){
          return _.escape(source);
@@ -186,6 +251,9 @@ define(function (require, exports, module) {
       return result.join(",");
    };
    
+   /**
+    * Update hint content and show
+   */
    ParameterHintManager.prototype._popupHint = function(){
       var hintText = "";
       
@@ -204,7 +272,7 @@ define(function (require, exports, module) {
    };
    
    /**
-     * Position a function hint.
+     * Set position for hint container.
      *
      * @param {number} xpos
      * @param {number} ypos
@@ -247,11 +315,22 @@ define(function (require, exports, module) {
       }
    };
    
+   /**
+    * Find parameters from given hint list
+    *
+    * @param {string} name - hint name
+    * @param {Array<HintList>} hintList - source array
+    *
+    * @return {string|number} parameters or -1, if hint cannot be found
+   */
    ParameterHintManager.prototype._findParams = function(name, hintList){
       var hint = hintList.find(function(item){ return item.getName() === name; });
       return (typeof hint !== "undefined") ? hint.getDetails() : -1;
    };
    
+   /**
+    * Register commands in brackets and create menu item
+   */
    ParameterHintManager.prototype._registerCommands = function(){
       var menu = Menus.getMenu(Menus.AppMenuBar.EDIT_MENU),
           self = this;
@@ -273,6 +352,10 @@ define(function (require, exports, module) {
       });
    };
    
+   /**
+    * Handles hint request called by command manager. If cursor is inside function (or mixin) parentheses
+    * this open new hint session
+   */
    ParameterHintManager.prototype._handleShowParameterCmd = function(){
       var cursor   = this.editor.getCursorPos(),
           token    = this.editor._codeMirror.getRange({line: cursor.line, ch: 0}, cursor),
@@ -296,8 +379,44 @@ define(function (require, exports, module) {
    };
    
    /**
+    * Store current hint data in stack
+   */
+   ParameterHintManager.prototype._storeHintState = function(){
+      this.hintStack.push({
+         name: this.hintName,
+         params: this.hintParams,
+         startCur: this.startCursor,
+         token: this.token,
+         offset: this.$hintContainer.offset()
+      });
+   };
+   
+   /**
+    * Restores data to current hint session
     *
-    */
+    * @param {Object} state - hint data
+    *
+    * @return {boolean} true, if success
+   */
+   ParameterHintManager.prototype._restoreHintState = function(state){
+      this.startCursor = state.startCur;
+      this.hintName    = state.name;
+      this.hintParams  = state.params;
+      this.token       = state.token;
+      
+      // back position
+      this.$hintContainer.offset(state.offset);
+      
+      return true;
+   };
+   
+   /**
+    * Find first open parenthesis position from the end of string
+    *
+    * @param {string} source - input text
+    *
+    * @return {number} position number or -1, if parenthesis not found
+   */
    ParameterHintManager.prototype._findBackParenthesis = function(source){
       var exp   = /[()]/,
           pos   = 0,
@@ -329,31 +448,56 @@ define(function (require, exports, module) {
       return -1;
    };
    
+   /**
+    * Override current command handler by own function
+   */
    ParameterHintManager.prototype.overrideCommands = function(){
       if(!this.cmdReleased) return false;
       crrCmdHandler._commandFn = this._handleShowParameterCmd.bind(this);
       this.cmdReleased = false;
    };
    
+   /**
+    * Restore previous function which handles command
+   */
    ParameterHintManager.prototype.releaseCommands = function(){
       if(this.cmdReleased) return false;
       crrCmdHandler._commandFn = crrCmdFunction;
       this.cmdReleased = true;
    };
    
+   /**
+    * Determines whether cursor is inside a function parentheses
+    *
+    * @param {Object} cursor - current cursor
+    *
+    * @return {boolean} false, if cursor is out of range
+   */
    ParameterHintManager.prototype._inParams = function(cursor){
-      if(cursor.line !== this.startCursor.line || cursor.ch < this.startCursor.ch ||
-      (this.token.substr(-1, 1) === ")" && this._findBackParenthesis(this.token.slice(0,-1)) === -1)){
+      // check cursor coordinates
+      if(cursor.line !== this.startCursor.line || cursor.ch < this.startCursor.ch) return false;
+      
+      // check, if cursor is behind a function call
+      if(this.token.substr(-1, 1) === ")" && this._findBackParenthesis(this.token.slice(0,-1)) === -1){
+         // is something stored in stack?
+         if(this.hintStack.length > 0){
+            return this._restoreHintState(this.hintStack.pop());
+         }
+         
          return false;
       }
       
       return true;
    };
    
+   /**
+    * Add listeners which track user input and session
+   */
    ParameterHintManager.prototype._addListeners = function(){
       var cursorPos,
           self = this;
       
+      console.log("ADD LISTENERS!");
       this.editor.on("keydown.sassHints", function(e, editor, domEvent){
          if(domEvent.keyCode === KeyEvent.DOM_VK_ESCAPE){
             self.closeHint();
@@ -381,19 +525,27 @@ define(function (require, exports, module) {
       });
    };
    
+   /**
+    * Get token from specified range
+    *
+    * @param {Object} endCur - current cursor position (end of range)
+    * @param {Object} startCur - optional. If this parameter is omitted, cached cursor will be used
+    *
+    * @return {string}  fragment text from editor
+    */
    ParameterHintManager.prototype._getToken = function(endCur, startCur){
       startCur = startCur || this.startCursor;
       return this.editor._codeMirror.getRange(startCur, endCur);
    };
    
+   /**
+    * Remove listeners which track user input and session
+   */
    ParameterHintManager.prototype._removeListeners = function(){
+      console.log("REMOVE LISTENERS!");
       this.editor.off("keydown.sassHints");
       this.editor.off("keypress.sassHints");
       this.editor.off("cursorActivity.sassHints");
-   };
-   
-   ParameterHintManager.prototype._addToStack = function(){
-      
    };
    
    module.exports = ParameterHintManager;
