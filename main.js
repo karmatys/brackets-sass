@@ -39,8 +39,9 @@ define(function (require, exports, module) {
        PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
        _                  = brackets.getModule("thirdparty/lodash");
        
-   var HintItem = require("HintItem"),
-       Strings  = require("i18n!nls/strings");
+   var HintItem             = require("HintItem"),
+       ParameterHintManager = require("ParameterHintManager"),
+       Strings              = require("i18n!nls/strings");
    
    // Import built-in sass functions
    var sassFunctions = JSON.parse(require("text!data/sass-functions.json"));
@@ -101,7 +102,7 @@ define(function (require, exports, module) {
    /**
     * @constructor
     */
-   function SassHint() {
+   function SassHint(paramHintHandler) {
       
       // reference to current session editor
       this.crrEditor = null;
@@ -144,6 +145,9 @@ define(function (require, exports, module) {
          ":": SassHint.hintModes.FN   // start hinting session for functions
       };
       
+      // create parameter hint manager
+      this.parameterManager = paramHintHandler || new ParameterHintManager();
+      
       // define what is currently searched
       this.crrHintMode  = 0;
       this.lastHintMode = null;
@@ -163,10 +167,10 @@ define(function (require, exports, module) {
    
    // const hint modes
    SassHint.hintModes = Object.freeze({
-      "VAR": 0,
-      "FN":  1,
-      "KEY": 2,
-      "MIX": 3
+      "FN":  0,
+      "MIX": 1,
+      "VAR": 2,
+      "KEY": 3
    });
    
    /**
@@ -195,6 +199,9 @@ define(function (require, exports, module) {
       // scan current file in search of @import declarations
       this.scanFiles(this.crrEditor.document);
       
+      // prepare parameter hint manager
+      this.parameterManager.init(this.crrEditor);
+      
       // join built-in functions if needed
       if(showBuiltFns && !this.fnCache.length){
          this.fnCache = this.fnCache.concat(this.builtFns);
@@ -210,10 +217,12 @@ define(function (require, exports, module) {
     * @return {boolean}  can the provider provide hints for this session?
     */
    SassHint.prototype.hasHints = function(editor, implicitChar){
+      var cursor, match, token;
+      
       // check for explicit hint request
       if(implicitChar === null){
-         var cursor    = editor.getCursorPos(),
-             startChar = 0;
+         var startChar = 0;
+         cursor = editor.getCursorPos();
 
          // hint mode was changed in previous session
          if(this.crrHintMode !== null && this.newSession){
@@ -223,8 +232,8 @@ define(function (require, exports, module) {
             return true;
          }
          
-         var token = this._getToken(cursor, {line: cursor.line, ch: 0}),
-             match = /([$@:][\w\-]*)\s*([\w\-]*)$/.exec(token);
+         token = this._getToken(cursor, {line: cursor.line, ch: 0});
+         match = /([$@:][\w\-]*)\s*([\w\-]*)$/.exec(token);
          
          // nothing found
          if(!match){
@@ -252,7 +261,7 @@ define(function (require, exports, module) {
       
       // hint request in standard mode
       if(typeof this.triggerHints[implicitChar] !== "undefined"){
-         var cursor = editor.getCursorPos();
+         cursor = editor.getCursorPos();
          this.crrHintMode = this.triggerHints[implicitChar];
          
          this._updateHints(cursor, this.crrHintMode);
@@ -263,6 +272,19 @@ define(function (require, exports, module) {
          return true;
       }
       
+      // hint request in parameter mode
+      if(implicitChar === "("){
+         var source;
+         
+         cursor = editor.getCursorPos();
+         source = this.getHintDataByParameterToken(this._getToken(cursor, {line: cursor.line, ch: 0}));
+         
+         if(!source) return false;
+         
+         this.parameterManager.openHint(source.name, source.hintList, cursor);
+         return false;
+      }
+     
       this.crrHintMode = null;
       return false;
    };
@@ -286,6 +308,9 @@ define(function (require, exports, module) {
       
       // get token from editor
       token = this._getToken(cursor);
+      
+      // hide parameters hint during this session
+      this.parameterManager.hideHint();
       
       switch(this.crrHintMode){
          case SassHint.hintModes.VAR:
@@ -341,11 +366,17 @@ define(function (require, exports, module) {
    SassHint.prototype.insertHint = function(hint){
       var insertText = hint.data("token"),
           keepHints  = false,
-          start      = {line: 0, ch: this.cursorCache.ch},
+          start      = this.cursorCache,
           end        = this.crrEditor.getCursorPos();
       
+      // when inserted hint is kind of function or mixin, then automatically opens parameters hint
+      if(this.crrHintMode <= SassHint.hintModes.MIX){
+         this._insertCallable(insertText, hint.find(".brackets-sass-hints-details").text(), start, end);
+         return keepHints;
+      }
+      
+      // insert hint and switch mode to mixin
       if(insertText === "include"){
-         keepHints   = true;
          insertText += " ";
          
          this.crrHintMode = SassHint.hintModes.MIX;
@@ -353,8 +384,6 @@ define(function (require, exports, module) {
       } else {
          this.crrHintMode = null;
       }
-      
-      start.line = end.line = this.cursorCache.line;
       
       // insert hint to editor
       this.crrEditor._codeMirror.replaceRange(insertText, start, end);
@@ -384,10 +413,48 @@ define(function (require, exports, module) {
    };
    
    /**
+    *
+   */
+   SassHint.prototype.getHintDataByParameterToken = function(token){
+      var match = /(?:@include )?\b([a-zA-Z0-9_\-]+)\($/.exec(token);
+
+      // nothing found
+      if(!match){
+         return false;
+      }
+
+      return {
+         name:     match[1],
+         hintList: match[0].charAt(0) === "@" ? this.mixins : this.functions 
+      };
+   };
+   
+   /**
+    * Insert selected hint that is function or mixin name and automatically open parameter hint session
+    *
+    * @param {string} hintName -
+    * @param {string} hintDetails - 
+    * @param {Object} start -
+    * @param {Object} end -
+    */
+   SassHint.prototype._insertCallable = function(hintName, hintDetails, start, end){
+      // insert text to editor
+      this.crrEditor._codeMirror.replaceRange(hintName + "()", start, end);
+      
+      // move cursor back 1 char
+      start.ch = end.ch + hintName.length + (start.ch - end.ch) + 1;
+      this.crrEditor.setCursorPos(start);
+      
+      // open parameters hint
+      this.parameterManager.openHint(hintName, hintDetails, start);
+      this.crrHintMode = null;
+   };
+   
+   /**
     * Get token from specified range
     *
     * @param {Object} currentCursor  Current cursor position (end of range)
-    * @param {Object} startCursr     Optional. If this parameter is omitted, cached cursor will be used
+    * @param {Object} startCursor    Optional. If this parameter is omitted, cached cursor will be used
     *
     * @return {string}  Fragment text from editor
     */
@@ -971,14 +1038,37 @@ define(function (require, exports, module) {
     * Register the HintProvider
     */
    AppInit.appReady(function(){
-      var hints = new SassHint();
+      var paramHints = new ParameterHintManager(),
+          hints      = new SassHint(paramHints);
       
-      var removeSaveListener = function(){
-         if(!hasSaveListener) return;
-         
-         DocumentManager.off("documentSaved.sassHints", onDocumentSaved);
-         hasSaveListener = false;
-      };
+      // workaround for sharing key binding with js parameter hint (built-in extension)
+      var removeSaveListener = (function(){
+         return paramHints.isCmdOverridden() ?
+            function(){
+               if(!hasSaveListener) return;
+               DocumentManager.off("documentSaved.sassHints", onDocumentSaved);
+               paramHints.releaseCommands();
+               hasSaveListener = false;
+            }
+            : function(){
+               if(!hasSaveListener) return;
+               DocumentManager.off("documentSaved.sassHints", onDocumentSaved);
+               hasSaveListener = false;
+            };
+      })();
+      
+      var addSaveListener = (function(){
+         return paramHints.isCmdOverridden() ?
+            function(){
+               DocumentManager.on("documentSaved.sassHints", onDocumentSaved);
+               paramHints.overrideCommands();
+               hasSaveListener = true;
+            }
+            : function(){
+               DocumentManager.on("documentSaved.sassHints", onDocumentSaved);
+               hasSaveListener = true;
+            };
+      })();
       
       var onDocumentSaved = function(e, doc){
          hints.scanFiles(doc);
@@ -998,14 +1088,18 @@ define(function (require, exports, module) {
          
          // register save event to update file information
          if(!hasSaveListener){
-            DocumentManager.on("documentSaved.sassHints", onDocumentSaved);
-            hasSaveListener = true;
+            addSaveListener();
          }
          
          hints.clearCache();
          hints.setEditor(editorFocus);
          hints.init();
       };
+      
+      // set function that gives last hint data (functions or mixins) when parameters are requested by cmd
+      paramHints.setDataForHintRequest(function(token){
+         return hints.getHintDataByParameterToken(token);
+      });
       
       if(sassHintsEnabled){
          EditorManager.on("activeEditorChange.sassHints", onEditorEvent);
