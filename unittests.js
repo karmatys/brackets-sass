@@ -286,7 +286,7 @@ define(function (require, exports, module) {
          });
 
          it("built-in functions included successfully", function(){
-            expect(SassHint.sassHintProvider.builtFns.length).toBe(78);
+            expect(SassHint.sassHintProvider.builtFns.length).toBe(77);
          });
 
          it("method _findCloseBrackets work successfully", function(){

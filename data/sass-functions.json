@@ -1,310 +1,310 @@
 {
    "rgb": {
-      "arguments": ["$red, $green, $blue"],
+      "parameters": "$red, $green, $blue",
       "description": "Creates a Color from red, green, and blue values."
    },
    "rgba": {
-      "arguments": ["$red, $green, $blue, $alpha", "$color, $alpha"],
+      "parameters": "$color, $alpha",
       "description": "Creates a Color from red, green, blue, and alpha values."
    },
    "red": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the red component of a color."
    },
    "green": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the green component of a color."
    },
    "blue": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the blue component of a color."
    },
    "mix": {
-      "arguments": ["$color1, $color2, [$weight]"],
+      "parameters": "$color1, $color2, [$weight]",
       "description": "Mixes two colors together."
    },
    "hsl": {
-      "arguments": ["$hue, $saturation, $lightness"],
+      "parameters": "$hue, $saturation, $lightness",
       "description": "Creates a Color from hue, saturation, and lightness values."
    },
    "hsla": {
-      "arguments": ["$hue, $saturation, $lightness, $alpha"],
+      "parameters": "$hue, $saturation, $lightness, $alpha",
       "description": "Creates a Color from hue, saturation, lightness, and alpha values."
    },
    "hue": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the hue component of a color."
    },
    "saturation": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the saturation component of a color."
    },
    "lightness": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the lightness component of a color."
    },
    "adjust-hue": {
-      "arguments": ["$color, $degrees"],
+      "parameters": "$color, $degrees",
       "description": "Changes the hue of a color."
    },
    "lighten": {
-      "arguments": ["$color, $amount"],
+      "parameters": "$color, $amount",
       "description": "Makes a color lighter."
    },
    "darken": {
-      "arguments": ["$color, $amount"],
+      "parameters": "$color, $amount",
       "description": "Makes a color darker."
    },
    "saturate": {
-      "arguments": ["$color, $amount"],
+      "parameters": "$color, $amount",
       "description": "Makes a color more saturated."
    },
    "desaturate": {
-      "arguments": ["$color, $amount"],
+      "parameters": "$color, $amount",
       "description": "Makes a color less saturated."
    },
    "grayscale": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Converts a color to grayscale."
    },
    "complement": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Returns the complement of a color."
    },
    "invert": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Returns the inverse of a color."
    },
    "opacity": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Gets the alpha component (opacity) of a color."
    },
    "fade-in": {
-      "arguments": ["$color, $amount"],
+      "parameters": "$color, $amount",
       "description": "Makes a color more opaque."
    },
    "fade-out": {
-      "arguments": ["$color, $amount"],
+      "parameters": "$color, $amount",
       "description": "Makes a color more transparent."
    },
    "adjust-color": {
-      "arguments": ["$color, [$red], [$green], [$blue], [$hue], [$saturation], [$lightness], [$alpha]"],
+      "parameters": "$color, [$red], [$green], [$blue], [$hue], [$saturation], [$lightness], [$alpha]",
       "description": "Increases or decreases one or more components of a color."
    },
    "scale-color": {
-      "arguments": ["$color, [$red], [$green], [$blue], [$saturation], [$lightness], [$alpha]"],
+      "parameters": "$color, [$red], [$green], [$blue], [$saturation], [$lightness], [$alpha]",
       "description": "Fluidly scales one or more properties of a color."
    },
    "change-color": {
-      "arguments": ["$color, [$red], [$green], [$blue], [$hue], [$saturation], [$lightness], [$alpha]"],
+      "parameters": "$color, [$red], [$green], [$blue], [$hue], [$saturation], [$lightness], [$alpha]",
       "description": "Changes one or more properties of a color."
    },
    "ie-hex-str": {
-      "arguments": ["$color"],
+      "parameters": "$color",
       "description": "Converts a color into the format understood by IE filters."
    },
    "unquote": {
-      "arguments": ["$string"],
+      "parameters": "$string",
       "description": "Removes quotes from a string."
    },
    "quote": {
-      "arguments": ["$string"],
+      "parameters": "$string",
       "description": "Adds quotes to a string."
    },
    "str-length": {
-      "arguments": ["$string"],
+      "parameters": "$string",
       "description": "Returns the number of characters in a string."
    },
    "str-insert": {
-      "arguments": ["$string, $insert, $index"],
+      "parameters": "$string, $insert, $index",
       "description": "Inserts $insert into $string at $index."
    },
    "str-index": {
-      "arguments": ["$string, $substring"],
+      "parameters": "$string, $substring",
       "description": "Returns the index of the first occurrence of $substring in $string."
    },
    "str-slice": {
-      "arguments": ["$string, $start-at, [$end-at]"],
+      "parameters": "$string, $start-at, [$end-at]",
       "description": "Extracts a substring from $string."
    },
    "to-upper-case": {
-      "arguments": ["$string"],
+      "parameters": "$string",
       "description": "Converts a string to upper case."
    },
    "to-lower-case": {
-      "arguments": ["$string"],
+      "parameters": "$string",
       "description": "Converts a string to lower case."
    },
    "percentage": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Converts a unitless number to a percentage."
    },
    "round": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Rounds a number to the nearest whole number."
    },
    "ceil": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Rounds a number up to the next whole number."
    },
    "floor": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Rounds a number down to the previous whole number."
    },
    "abs": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Returns the absolute value of a number."
    },
    "min": {
-      "arguments": ["$numbers…"],
+      "parameters": "$numbers…",
       "description": "Finds the minimum of several numbers."
    },
    "max": {
-      "arguments": ["$numbers…"],
+      "parameters": "$numbers…",
       "description": "Finds the maximum of several numbers."
    },
    "random": {
-      "arguments": ["[$limit]"],
+      "parameters": "[$limit]",
       "description": "Returns a random number."
    },
    "length": {
-      "arguments": ["$list"],
+      "parameters": "$list",
       "description": "Returns the length of a list."
    },
    "nth": {
-      "arguments": ["$list, $n"],
+      "parameters": "$list, $n",
       "description": "Returns a specific item in a list."
    },
    "set-nth": {
-      "arguments": ["$list, $n, $value"],
+      "parameters": "$list, $n, $value",
       "description": "Replaces the nth item in a list."
    },
    "join": {
-      "arguments": ["$list1, $list2, [$separator]"],
+      "parameters": "$list1, $list2, [$separator]",
       "description": "Joins together two lists into one."
    },
    "append": {
-      "arguments": ["$list1, $val, [$separator]"],
+      "parameters": "$list1, $val, [$separator]",
       "description": "Appends a single value onto the end of a list."
    },
    "zip": {
-      "arguments": ["$lists…"],
+      "parameters": "$lists…",
       "description": "Combines several lists into a single multidimensional list."
    },
    "index": {
-      "arguments": ["$list, $value"],
+      "parameters": "$list, $value",
       "description": "Returns the position of a value within a list."
    },
    "list-separator": {
-      "arguments": ["$list"],
+      "parameters": "$list",
       "description": "Returns the separator of a list."
    },
    "map-get": {
-      "arguments": ["$map, $key"],
+      "parameters": "$map, $key",
       "description": "Returns the value in a map associated with a given key."
    },
    "map-merge": {
-      "arguments": ["$map1, $map2"],
+      "parameters": "$map1, $map2",
       "description": "Merges two maps together into a new map."
    },
    "map-remove": {
-      "arguments": ["$map, $keys…"],
+      "parameters": "$map, $keys…",
       "description": "Returns a new map with keys removed."
    },
    "map-keys": {
-      "arguments": ["$map"],
+      "parameters": "$map",
       "description": "Returns a list of all keys in a map."
    },
    "map-values": {
-      "arguments": ["$map"],
+      "parameters": "$map",
       "description": "Returns a list of all values in a map."
    },
    "map-has-key": {
-      "arguments": ["$map, $key"],
+      "parameters": "$map, $key",
       "description": "Returns whether a map has a value associated with a given key."
    },
    "keywords": {
-      "arguments": ["$args"],
+      "parameters": "$args",
       "description": "Returns the keywords passed to a function that takes variable arguments."
    },
    "selector-nest": {
-      "arguments": ["$selectors…"],
+      "parameters": "$selectors…",
       "description": "Nests selector beneath one another like they would be nested in the stylesheet."
    },
    "selector-append": {
-      "arguments": ["$selectors…"],
+      "parameters": "$selectors…",
       "description": "Appends selectors to one another without spaces in between."
    },
    "selector-extend": {
-      "arguments": ["$selector, $extendee, $extender"],
+      "parameters": "$selector, $extendee, $extender",
       "description": "Extends $extendee with $extender within $selector."
    },
    "selector-replace": {
-      "arguments": ["$selector, $original, $replacement"],
+      "parameters": "$selector, $original, $replacement",
       "description": "Replaces $original with $replacement within $selector."
    },
    "selector-unify": {
-      "arguments": ["$selector1, $selector2"],
+      "parameters": "$selector1, $selector2",
       "description": "Unifies two selectors to produce a selector that matches elements matched by both."
    },
    "is-superselector": {
-      "arguments": ["$super, $sub"],
+      "parameters": "$super, $sub",
       "description": "Returns whether $super matches all the elements $sub does, and possibly more."
    },
    "simple-selectors": {
-      "arguments": ["$selector"],
+      "parameters": "$selector",
       "description": "Returns the simple selectors that comprise a compound selector."
    },
    "selector-parse": {
-      "arguments": ["$selector"],
+      "parameters": "$selector",
       "description": "Parses a selector into the format returned by &."
    },
    "feature-exists": {
-      "arguments": ["$feature"],
+      "parameters": "$feature",
       "description": "Returns whether a feature exists in the current Sass runtime."
    },
    "variable-exists": {
-      "arguments": ["$name"],
+      "parameters": "$name",
       "description": "Returns whether a variable with the given name exists in the current scope."
    },
    "global-variable-exists": {
-      "arguments": ["$name"],
+      "parameters": "$name",
       "description": "Returns whether a variable with the given name exists in the global scope."
    },
    "function-exists": {
-      "arguments": ["$name"],
+      "parameters": "$name",
       "description": "Returns whether a function with the given name exists."
    },
    "mixin-exists": {
-      "arguments": ["$name"],
+      "parameters": "$name",
       "description": "Returns whether a mixin with the given name exists."
    },
    "inspect": {
-      "arguments": ["$value"],
+      "parameters": "$value",
       "description": "Returns the string representation of a value as it would be represented in Sass."
    },
    "type-of": {
-      "arguments": ["$value"],
+      "parameters": "$value",
       "description": "Returns the type of a value."
    },
    "unit": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Returns the unit(s) associated with a number."
    },
    "unitless": {
-      "arguments": ["$number"],
+      "parameters": "$number",
       "description": "Returns whether a number has units."
    },
    "comparable": {
-      "arguments": ["$number1, $number2"],
+      "parameters": "$number1, $number2",
       "description": "Returns whether two numbers can be added, subtracted, or compared."
    },
    "call": {
-      "arguments": ["$name, $args…"],
+      "parameters": "$name, $args…",
       "description": "Dynamically calls a Sass function."
    },
    "if": {
-      "arguments": ["$condition, $if-true, $if-false"],
+      "parameters": "$condition, $if-true, $if-false",
       "description": "Returns one of two values, depending on whether or not $condition is true."
    }
 }

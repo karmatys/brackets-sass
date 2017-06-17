@@ -131,7 +131,10 @@ define(function (require, exports, module) {
       this.builtFns = [];
       
       // sass keywords
-      this.keywords = ["import", "mixin", "extend", "function", "include", "media", "if", "return", "for", "each", "else", "while"];
+      this.keywords = ["import", "mixin", "extend", "function", "include", "media", "if", "return", "for", "each", "else", "while", "debug", "warn", "error", "at-root"];
+
+      // css rules
+      this.cssRules = ["charset", "namespace", "supports", "page", "font-face", "keyframes"];
       
       // imported files object
       this.importedFiles = {
@@ -177,18 +180,24 @@ define(function (require, exports, module) {
     * Prepare object to work. This will be called only once, when instance will be created
     */
    SassHint.prototype._init = function(){
-      var self = this;
+      var self = this,
+          item;
       
       // prepare keywords
       this.keywords = this.keywords.map(function(key){
-         return new HintItem(key, "", "K", "keyword");
+         item = new HintItem(key, "", "K", "keyword");
+         item.setPriority(HintItem.priorities.medium);
+         return item;
       });
-      
+
+      // prepare css rules
+      this.cssRules.forEach(function(value){
+         self.keywords.push(new HintItem(value, "", "K", "css keyword"));
+      });
+
       // prepare built-in sass functions
       _.forEach(sassFunctions, function(value, key){
-         value.arguments.forEach(function(args){
-            self.builtFns.push(new HintItem(key, "(" + args + ")", "F", "sass"));
-         });
+         self.builtFns.push(new HintItem(key, "(" + value.parameters + ")", "F", "sass"));
       });
    };
    
