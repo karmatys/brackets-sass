@@ -22,7 +22,7 @@
  */
 
 /*jshint plusplus: false, devel: false, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
-/*global define, brackets, describe, it, xit, expect, beforeEach, afterEach, beforeFirst, afterLast, waitsFor, runs */
+/*global $, define, brackets, describe, it, xit, expect, beforeEach, afterEach, beforeFirst, afterLast, waitsFor, runs */
 
 define(function (require, exports, module) {
    "use strict";
@@ -189,6 +189,55 @@ define(function (require, exports, module) {
          list.forEach(function(value){
             expect(_indexOf(hintList, value)).toBe(-1);
          });
+      }
+      
+      /**
+       * Find specific element from list of hints
+       *
+       * @param {Array<HintItem>} hintList - the list of hints
+       * @param {string} item - the string represenation of the hint to find
+       *
+       * return {HintItem} reference to item or -1 if it's not found
+      */
+      function findHint(hintList, item){
+         return hintList.find(function(elem){
+            return elem.data("token") === item;
+         });
+      }
+      
+      /**
+       * Ask provider for parameters hint and expect it return any. Optional it can be 
+       * specified, which parameter should be active now
+       *
+       * @param {SassHint} provider - a CodeHintProvider object
+       * @param {string} activeItem - name of parameter that should be active
+      */
+      function expectParameters(provider, activeItem){
+         provider.parameterManager._handleShowParameterCmd();
+         expect(provider.parameterManager.isActive()).toBe(true);
+         
+         if(typeof activeItem !== "undefined"){
+            isActiveParameter(activeItem);
+         }
+      }
+      
+      /**
+       * Ask provider for parameters hint and expect it not to return any
+       *
+       * @param {SassHint} provider - a CodeHintProvider object
+      */
+      function expectNoParameters(provider){
+         provider.parameterManager._handleShowParameterCmd();
+         expect(provider.parameterManager.isActive()).toBe(false);
+      }
+      
+      /**
+       * Expect that specific parameter in current parameters hint session is active now
+       *
+       * @param {string} itemText - name of parameter that should be active
+      */
+      function isActiveParameter(itemText){
+         expect($(".current-parameter:first").text().trim()).toBe(itemText);
       }
       
       /**
@@ -428,6 +477,141 @@ define(function (require, exports, module) {
             
             expect(getHints(SassHint.sassHintProvider, ":").length).not.toBeGreaterThan(10);
             setPreference("maxHints", 50);
+         });
+      });
+      
+      describe("Parameter Hint Manager", function(){
+         var paramManager;
+         
+         beforeFirst(function(){
+            paramManager = SassHint.sassHintProvider.parameterManager;
+         });
+         
+         afterLast(function(){
+            paramManager = null;
+         });
+         
+         beforeEach(function() {
+            // create dummy editor
+            mock = SpecRunnerUtils.createMockEditor(testContent, "scss");
+            testDocument = mock.doc;
+            testEditor   = mock.editor;
+            
+            // emulate activeEditorChange event
+            SassHint.sassHintProvider.clearCache();
+            SassHint.sassHintProvider.setEditor(testEditor);
+            SassHint.sassHintProvider.init();
+         });
+
+         afterEach(function() {
+            // be sure, that session is closed before next test will start
+            paramManager.closeHint();
+            
+            // destroy editor
+            SpecRunnerUtils.destroyMockEditor(testDocument);
+            testEditor   = null;
+            testDocument = null;
+         });
+         
+         it("should display parameters, after execute command", function(){
+            setCursorPos(78, 16);
+            expectParameters(SassHint.sassHintProvider);
+         });
+         
+         it("should not display any parameters, after execute command", function(){
+            setCursorPos(77, 21);
+            expectNoParameters(SassHint.sassHintProvider);
+         });
+         
+         it("should hide parameters content, before variables hint list will be displayed", function(){
+            insertText("sum(", -2, 1);
+            setCursorPos(-2, 5);
+            
+            // show parameters
+            expectParameters(SassHint.sassHintProvider);
+            
+            // insert variable
+            getHints(SassHint.sassHintProvider, "$");
+            
+            // check whether content is hidden
+            expect(paramManager.isActive()).toBe(true);
+            expect(paramManager.isVisible()).toBe(false);
+         });
+         
+         it("should close parameters hint session, when cursor is moved behind function declaration", function(){
+            setCursorPos(78, 22);
+            expectParameters(SassHint.sassHintProvider);
+            
+            // move cursor forward
+            setCursorPos(78,23);
+            expect(paramManager.isActive()).toBe(false);
+         });
+         
+         it("should close parameters hint session, when cursor is moved before open parenthesis", function(){
+            setCursorPos(78, 16);
+            expectParameters(SassHint.sassHintProvider);
+            
+            // move cursor backward
+            setCursorPos(78,15);
+            expect(paramManager.isActive()).toBe(false);
+         });
+         
+         it("should dismiss second attempt to create parameters hint session, which was explicitly executed by command", function(){
+            setCursorPos(78, 16);
+            expectParameters(SassHint.sassHintProvider);
+            
+            // try to create second session after command
+            paramManager._handleShowParameterCmd();
+            
+            // stack should be empty if second attempt was dimissed
+            expect(paramManager.hintStack.length).toBe(0);
+         });
+         
+         it("should activate second parameter in hint container, when cursor is moved forward", function(){
+            setCursorPos(78, 18);
+            expectParameters(SassHint.sassHintProvider, "$a");
+            
+            setCursorPos(78, 19);
+            isActiveParameter("$b");
+         });
+         
+         it("should activate second parameter in hint container, when comma was inserted", function(){
+            insertText("hsl(5)", -2, 1);
+            setCursorPos(-2, 6);
+            expectParameters(SassHint.sassHintProvider, "$hue");
+            
+            // insert comma
+            insertText(",", -2, 6);
+            isActiveParameter("$saturation");
+         });
+         
+         it("should automatically open parameters hint, when sass function was inserted (as hint item from previous session)", function(){
+            insertText("padding-left: ro", -2, 1);
+            setCursorPos(-2, 17);
+            
+            var hintList = getHints(SassHint.sassHintProvider, ""),
+                hintItem = findHint(hintList, "round");
+            
+            expect(hintItem).not.toBeNull();
+            SassHint.sassHintProvider.insertHint(hintItem);
+            
+            expect(paramManager.isActive()).toBe(true);
+            isActiveParameter("$number");
+         });
+         
+         it("should store previous hint data in stack, when open function was given as argument", function(){
+            insertText("padding-left: round(", -2, 1);
+            setCursorPos(-2, 21);
+            expectParameters(SassHint.sassHintProvider, "$number");
+            
+            // insert function name as argument and open parenthesis
+            insertText("abs(", -2, 21);
+            SassHint.sassHintProvider.hasHints(testEditor, "(");
+            
+            // check stack and session state
+            expect(paramManager.isActive()).toBe(true);
+            expect(paramManager.hintStack.length).toBe(1);
+            expect(paramManager.hintStack[0].name).toBe("round");
          });
       });
    });

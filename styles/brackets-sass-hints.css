@@ -81,3 +81,27 @@
    float: right;
    margin-left: 8px;
 }
+
+/* parameter hints */
+#function-hint-container.brackets-sass-param {
+   display: none;
+   background: #fff;
+   position: absolute;
+   z-index: 15;
+   left: 200px;
+   top: 40px;
+   pointer-events: none;
+   padding: 1px 6px;
+   text-align: center;
+   border-radius: 3px;
+   box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24);
+}
+.brackets-sass-phm .current-parameter {
+   font-weight: 500;
+}
+.dark #function-hint-container.brackets-sass-param {
+   background: #000;
+   border: 1px solid rgba(255,255,255,0.15);
+   color: #fff;
+   box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24);
+}

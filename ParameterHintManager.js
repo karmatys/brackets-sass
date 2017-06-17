@@ -336,7 +336,7 @@ define(function (require, exports, module) {
           self = this;
       
       // register the command handler
-      CommandManager.register(Strings.CMD_SHOW_PARAMETER_HINT, SASS_PARAM_CMD_ID, this._handleShowParameterHint);
+      CommandManager.register(Strings.CMD_SHOW_PARAMETER_HINT, SASS_PARAM_CMD_ID, this._handleShowParameterCmd.bind(this));
       
       // Add the menu items
       if (menu) {
@@ -357,6 +357,12 @@ define(function (require, exports, module) {
     * this open new hint session
    */
    ParameterHintManager.prototype._handleShowParameterCmd = function(){
+      // if hint session is active, show hint
+      if(this.active){
+         this.showHint();
+         return;
+      }
+      
       var cursor   = this.editor.getCursorPos(),
           token    = this.editor._codeMirror.getRange({line: cursor.line, ch: 0}, cursor),
           startAt  = this._findBackParenthesis(token),
@@ -364,7 +370,7 @@ define(function (require, exports, module) {
           source   = [];
       
       if(startAt === -1){
-         return false;
+         return;
       }
       
       startCur = {line: cursor.line, ch: startAt + 1};
@@ -372,7 +378,7 @@ define(function (require, exports, module) {
       source   = this.dataHandler(token);
       
       if(!source){
-         return false;
+         return;
       }
       
       this.openHint(source.name, source.hintList, startCur, this._getToken(cursor, startCur));
@@ -387,7 +393,7 @@ define(function (require, exports, module) {
          params: this.hintParams,
          startCur: this.startCursor,
          token: this.token,
-         offset: this.$hintContainer.offset()
+         offset: {top: parseFloat(this.$hintContainer[0].style.top), left: parseFloat(this.$hintContainer[0].style.left)}
       });
    };
    
@@ -497,7 +503,6 @@ define(function (require, exports, module) {
       var cursorPos,
           self = this;
       
-      console.log("ADD LISTENERS!");
       this.editor.on("keydown.sassHints", function(e, editor, domEvent){
          if(domEvent.keyCode === KeyEvent.DOM_VK_ESCAPE){
             self.closeHint();
@@ -542,7 +547,6 @@ define(function (require, exports, module) {
     * Remove listeners which track user input and session
    */
    ParameterHintManager.prototype._removeListeners = function(){
-      console.log("REMOVE LISTENERS!");
       this.editor.off("keydown.sassHints");
       this.editor.off("keypress.sassHints");
       this.editor.off("cursorActivity.sassHints");

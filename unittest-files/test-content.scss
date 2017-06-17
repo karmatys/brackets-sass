@@ -75,5 +75,6 @@ $sizeB: 10em;
 body{
    background-color: $white;
    @include clearfix;
-   
+   margin: sum(20, 20);
+
 }

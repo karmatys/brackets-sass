@@ -371,8 +371,11 @@ define(function (require, exports, module) {
       
       // when inserted hint is kind of function or mixin, then automatically opens parameters hint
       if(this.crrHintMode <= SassHint.hintModes.MIX){
-         this._insertCallable(insertText, hint.find(".brackets-sass-hints-details").text(), start, end);
-         return keepHints;
+         var hintParams = hint.find(".brackets-sass-hints-details").text();
+         if(hintParams !== ""){
+            this._insertCallable(insertText, hintParams, start, end);
+            return keepHints;
+         }
       }
       
       // insert hint and switch mode to mixin
@@ -1114,7 +1117,7 @@ define(function (require, exports, module) {
       ExtensionUtils.loadStyleSheet(module, "styles/brackets-sass-hints.css");
       
       // add sass object to hint manager
-      CodeHintManager.registerHintProvider(hints, fileExtensions, 1);
+      CodeHintManager.registerHintProvider(hints, fileExtensions, 2);
       
       // for unit tests
       exports.sassHintProvider = hints;

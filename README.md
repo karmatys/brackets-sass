@@ -29,8 +29,7 @@ For more information on setting preferences see [How to Use Brackets - Preferenc
 
 ### Planned development
 
-1. Functions / Mixins paramenter hints
-2. Jump to definition
+1. Jump to definition
 
 ### License
 MIT-licensed -- see `main.js` for details.
