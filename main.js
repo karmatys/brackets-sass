@@ -29,6 +29,10 @@ define(function (require, exports, module) {
    
    var AppInit            = brackets.getModule("utils/AppInit"),
        CodeHintManager    = brackets.getModule("editor/CodeHintManager"),
+       Commands           = brackets.getModule("command/Commands"),
+       CommandManager     = brackets.getModule("command/CommandManager"),
+       KeyBindingManager  = brackets.getModule("command/KeyBindingManager"),
+       Menus              = brackets.getModule("command/Menus"),
        EditorManager      = brackets.getModule("editor/EditorManager"),
        DocumentManager    = brackets.getModule("document/DocumentManager"),
        FileUtils          = brackets.getModule("file/FileUtils"),
@@ -37,6 +41,7 @@ define(function (require, exports, module) {
        ExtensionUtils     = brackets.getModule("utils/ExtensionUtils"),
        Async              = brackets.getModule("utils/Async"),
        PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
+       BracketsStrings    = brackets.getModule("strings"),
        _                  = brackets.getModule("thirdparty/lodash");
        
    var HintItem             = require("HintItem"),
@@ -45,6 +50,15 @@ define(function (require, exports, module) {
    
    // Import built-in sass functions
    var sassFunctions = JSON.parse(require("text!data/sass-functions.json"));
+   
+   // Command consts
+   var KEY_BINDING      = "Ctrl-Shift-Space",
+       SASS_FUNC_CMD_ID = "sassHints.showFunctionHints";
+   
+   // Store references to existing command
+   var crrCmd, 
+       crrCmdHandler,
+       crrCmdFunction;
    
    // Preferences variables
    var commonLibPath    = "",
@@ -102,7 +116,7 @@ define(function (require, exports, module) {
    /**
     * @constructor
     */
-   function SassHint(paramHintHandler) {
+   function SassHint() {
       
       // reference to current session editor
       this.crrEditor = null;
@@ -145,24 +159,26 @@ define(function (require, exports, module) {
       this.triggerHints = {
          "$": SassHint.hintModes.VAR, // start hinting session for variables
          "@": SassHint.hintModes.KEY, // start hinting session for sass keywords
-         ":": SassHint.hintModes.FN   // start hinting session for functions
       };
       
       // create parameter hint manager
-      this.parameterManager = paramHintHandler || new ParameterHintManager();
+      this.parameterManager = new ParameterHintManager();
       
       // define what is currently searched
       this.crrHintMode  = 0;
       this.lastHintMode = null;
       
-      // expresion for variables
+      // expresion for variables, functions, mixins, ect.
       this.varRegExp     = /\$([A-Za-z0-9_\-]+):\s*([^\n;]+);/g;
       this.mixRegExp     = /@mixin\s+([A-Za-z0-9\-_]+)\s*(?:\(([^\{\(]*)\))?\s*\{/g;
       this.fnRegExp      = /@function\s+([A-Za-z0-9\-_]+)\s*\(([^\{\(]*)\)\s*\{/g;
       this.commentRegExp = /\/\*[^]*?(?:\*\/|$)|\/\/[^\n]*/g;
       
-      // define if new session is required
+      // define, if new session is required
       this.newSession = false;
+      
+      // specify, whether function associated with existing command was overridden
+      this.cmdOverriden = false;
       
       // prepare some properties
       this._init();
@@ -199,6 +215,15 @@ define(function (require, exports, module) {
       _.forEach(sassFunctions, function(value, key){
          self.builtFns.push(new HintItem(key, "(" + value.parameters + ")", "F", "sass"));
       });
+      
+      // check, if command is defined and associated with the same keys
+      crrCmd = KeyBindingManager.getKeymap()[KEY_BINDING];
+      if(typeof crrCmd !== "undefined"){
+         crrCmdHandler  = CommandManager.get(crrCmd.commandID);
+         crrCmdFunction = crrCmdHandler._commandFn;
+      } else {
+         this._registerCommands();
+      }
    };
    
    /**
@@ -235,26 +260,24 @@ define(function (require, exports, module) {
 
          // hint mode was changed in previous session
          if(this.crrHintMode !== null && this.newSession){
+            this.cursorCache = this.cursorCache || cursor;
             this._updateHints({line: -1}, this.crrHintMode);
-            this.cursorCache = cursor;
             this.newSession  = false;
             return true;
          }
          
          token = this._getToken(cursor, {line: cursor.line, ch: 0});
-         match = /([$@:][\w\-]*)\s*([\w\-]*)$/.exec(token);
+         match = /([$@][\w\-]*)\s*([\w\-]*)$/.exec(token);
          
          // nothing found
          if(!match){
             return false;
          }
          
-         // maybe we should display mixins or function hint
-         if(match[2] !== ""){
+         // maybe we should display mixins hint
+         if(match[1] === "@include"){
             startChar = match[2].length;
-            
-            // mixins and keywords have the same trigger symbol @, so we must distinguish @include from other keywords
-            this.crrHintMode = (match[1] === "@include") ? SassHint.hintModes.MIX : SassHint.hintModes.FN;
+            this.crrHintMode = SassHint.hintModes.MIX;
          } else {
             startChar = match[0].length-1;
             this.crrHintMode = this.triggerHints[match[1].charAt(0)];
@@ -391,6 +414,7 @@ define(function (require, exports, module) {
       if(insertText === "include"){
          insertText += " ";
          
+         this.cursorCache = null;
          this.crrHintMode = SassHint.hintModes.MIX;
          this.newSession  = keepHints = true;
       } else {
@@ -422,6 +446,34 @@ define(function (require, exports, module) {
       this.fnCache       = [];
       this.mixCache      = [];
       this.lastHintMode  = null;
+   };
+   
+   /**
+    * Determines, if command (associated with the same keys) was detected and overridden.
+    * It's possible to restore previous command function by #releaseCommands method
+    *
+    * @return {boolean} true, if command was overridden
+   */
+   SassHint.prototype.isCmdOverridden = function(){
+      return typeof crrCmd !== "undefined";
+   };
+   
+   /**
+    * Override current command handler by own function
+   */
+   SassHint.prototype.overrideCommands = function(){
+      if(this.cmdOverriden) return false;
+      crrCmdHandler._commandFn = this._handleFunctionCmd.bind(this);
+      this.cmdOverriden = true;
+   };
+   
+   /**
+    * Restore previous function which handles command
+   */
+   SassHint.prototype.restoreCommands = function(){
+      if(!this.cmdOverriden) return false;
+      crrCmdHandler._commandFn = crrCmdFunction;
+      this.cmdOverriden = false;
    };
    
    /**
@@ -1052,19 +1104,74 @@ define(function (require, exports, module) {
    };
    
    /**
+    * Handles hint request invoked by command manager. First it checks, whether parameters hint session should
+    * be opened, if not it tries to open function hint session
+   */
+   SassHint.prototype._handleFunctionCmd = function(){
+      var cursorPos  = this.crrEditor.getCursorPos(),
+          inputToken = this._getToken(cursorPos, {line: cursorPos.line, ch:0}),
+          self       = this;
+      
+      // look for a parameters hint first
+      var paramState = this.parameterManager.handleParametersCmd(function(token){
+         return self.getHintDataByParameterToken(token);
+      }, cursorPos, inputToken);
+      
+      // nothing found, show functions hint list
+      if(!paramState){
+         var match = inputToken.match(/(?:^|\s)([a-zA-Z0-9_\-]+)$/);
+         
+         if(match && match[1] !== ""){
+            cursorPos.ch -= match[1].length;
+         }
+         
+         // create new hint session
+         this.cursorCache = cursorPos;
+         this.newSession  = true;
+         this.crrHintMode = SassHint.hintModes.FN;
+         
+         // execute CodeHintMamanger command
+         CommandManager.execute(Commands.SHOW_CODE_HINTS);
+      }
+   };
+   
+   /**
+    * Register commands in brackets and create menu item
+   */
+   SassHint.prototype._registerCommands = function(){
+      var menu = Menus.getMenu(Menus.AppMenuBar.EDIT_MENU),
+          self = this;
+      
+      // register the command handler
+      CommandManager.register(BracketsStrings.CMD_SHOW_PARAMETER_HINT, SASS_FUNC_CMD_ID, this._handleFunctionCmd.bind(this));
+      
+      // Add the menu items
+      if (menu) {
+          menu.addMenuItem(SASS_FUNC_CMD_ID, KEY_BINDING, Menus.AFTER, Commands.SHOW_CODE_HINTS);
+      }
+
+      // Close the function hint when commands are executed, except for the commands
+      // to show function hints for code hints.
+      CommandManager.on("beforeExecuteCommand", function (event, commandId) {
+         if (commandId !== SASS_FUNC_CMD_ID) {
+            self.closeHint();
+         }
+      });
+   };
+   
+   /**
     * Register the HintProvider
     */
    AppInit.appReady(function(){
-      var paramHints = new ParameterHintManager(),
-          hints      = new SassHint(paramHints);
+      var hints = new SassHint();
       
       // workaround for sharing key binding with js parameter hint (built-in extension)
       var removeSaveListener = (function(){
-         return paramHints.isCmdOverridden() ?
+         return hints.isCmdOverridden() ?
             function(){
                if(!hasSaveListener) return;
                DocumentManager.off("documentSaved.sassHints", onDocumentSaved);
-               paramHints.releaseCommands();
+               hints.restoreCommands();
                hasSaveListener = false;
             }
             : function(){
@@ -1075,10 +1182,10 @@ define(function (require, exports, module) {
       })();
       
       var addSaveListener = (function(){
-         return paramHints.isCmdOverridden() ?
+         return hints.isCmdOverridden() ?
             function(){
                DocumentManager.on("documentSaved.sassHints", onDocumentSaved);
-               paramHints.overrideCommands();
+               hints.overrideCommands();
                hasSaveListener = true;
             }
             : function(){
@@ -1112,11 +1219,6 @@ define(function (require, exports, module) {
          hints.setEditor(editorFocus);
          hints.init();
       };
-      
-      // set function that gives last hint data when parameters are requested by cmd
-      paramHints.setDataForHintRequest(function(token){
-         return hints.getHintDataByParameterToken(token);
-      });
       
       if(sassHintsEnabled){
          EditorManager.on("activeEditorChange.sassHints", onEditorEvent);

@@ -27,22 +27,11 @@
 define(function (require, exports, module) {
    "use strict";
    
-   var Commands          = brackets.getModule("command/Commands"),
-       CommandManager    = brackets.getModule("command/CommandManager"),
-       KeyBindingManager = brackets.getModule("command/KeyBindingManager"),
-       Menus             = brackets.getModule("command/Menus"),
-       KeyEvent          = brackets.getModule("utils/KeyEvent"),
+   var KeyEvent          = brackets.getModule("utils/KeyEvent"),
        Strings           = brackets.getModule("strings"),
        _                 = brackets.getModule("thirdparty/lodash");
    
    var hintBody = "<div id=\"function-hint-container\" class=\"brackets-sass-param\"><div class=\"function-hint-content\"></div></div>";
-   
-   var KEY_BINDING       = "Ctrl-Shift-Space",
-       SASS_PARAM_CMD_ID = "sassHints.showParameterHint";
-   
-   var crrCmd, 
-       crrCmdHandler,
-       crrCmdFunction;
    
    /**
     * @constructor
@@ -51,8 +40,6 @@ define(function (require, exports, module) {
       this.hintStack   = [];
       this.visible     = false;
       this.active      = false;
-      this.cmdReleased = true;
-      this.dataHandler = null;
       this.editor      = null;
       
       this.hintName   = "";
@@ -79,15 +66,6 @@ define(function (require, exports, module) {
       }
       
       this.$hintContent = this.$hintContainer.children().first();
-      
-      // check, if command is defined and associated with the same keys
-      crrCmd = KeyBindingManager.getKeymap()[KEY_BINDING];
-      if(typeof crrCmd !== "undefined"){
-         crrCmdHandler  = CommandManager.get(crrCmd.commandID);
-         crrCmdFunction = crrCmdHandler._commandFn;
-      } else {
-         this._registerCommands();
-      }
    };
    
    /**
@@ -114,25 +92,6 @@ define(function (require, exports, module) {
    */
    ParameterHintManager.prototype.isVisible = function(){
       return this.visible;
-   };
-   
-   /**
-    * Determines, if command (associated with the same keys) was detected and overridden.
-    * It's possible to restore previous command function by #releaseCommands method
-    *
-    * @return {boolean} true, if command was overridden
-   */
-   ParameterHintManager.prototype.isCmdOverridden = function(){
-      return typeof crrCmd !== "undefined";
-   };
-   
-   /**
-    * Defines function which provides data (HintItem array) when parameter hints will be request by command
-    *
-    * @param {function} fn - function which returns data for hint request
-   */
-   ParameterHintManager.prototype.setDataForHintRequest = function(fn){
-      this.dataHandler = fn;
    };
    
    /**
@@ -206,7 +165,7 @@ define(function (require, exports, module) {
     * @return {boolean} true, if success
    */
    ParameterHintManager.prototype.showHint = function(){
-      if(!this.active && this.visible) return false;
+      if(!this.active || this.visible) return false;
       
       this.$hintContainer.show();
       return this.visible = true;
@@ -329,59 +288,45 @@ define(function (require, exports, module) {
    };
    
    /**
-    * Register commands in brackets and create menu item
+    * Handles hint request called by command manager. If cursor is between function (or mixin) parentheses
+    * it tries to open new parameters hint session
+    *
+    * @param {function} dataFn - callback function which returns data for hint request
+    * @param {Object}   cursor - cursor position
+    * @param {string}   token  - fragment of code to analyze
+    *
+    * @return {boolean} - true, if new session will be opened
    */
-   ParameterHintManager.prototype._registerCommands = function(){
-      var menu = Menus.getMenu(Menus.AppMenuBar.EDIT_MENU),
-          self = this;
-      
-      // register the command handler
-      CommandManager.register(Strings.CMD_SHOW_PARAMETER_HINT, SASS_PARAM_CMD_ID, this._handleShowParameterCmd.bind(this));
-      
-      // Add the menu items
-      if (menu) {
-          menu.addMenuItem(SASS_PARAM_CMD_ID, KEY_BINDING, Menus.AFTER, Commands.SHOW_CODE_HINTS);
-      }
-
-      // Close the function hint when commands are executed, except for the commands
-      // to show function hints for code hints.
-      CommandManager.on("beforeExecuteCommand", function (event, commandId) {
-         if (commandId !== SASS_PARAM_CMD_ID) {
-            self.closeHint();
-         }
-      });
-   };
-   
-   /**
-    * Handles hint request called by command manager. If cursor is inside function (or mixin) parentheses
-    * this open new hint session
-   */
-   ParameterHintManager.prototype._handleShowParameterCmd = function(){
-      // if hint session is active, show hint
+   ParameterHintManager.prototype.handleParametersCmd = function(dataFn, cursor, token){
+      // when hint session is active, showHint function tries to show parameters if they're 
+      // not visible yet, otherwise return false
       if(this.active){
-         this.showHint();
-         return;
+         return this.showHint();
       }
       
-      var cursor   = this.editor.getCursorPos(),
-          token    = this.editor._codeMirror.getRange({line: cursor.line, ch: 0}, cursor),
-          startAt  = this._findBackParenthesis(token),
+      // prepare input data
+      cursor = cursor || this.editor.getCursorPos();
+      token  = token  || this._getToken(cursor, {line: cursor.line, ch: 0});      
+   
+      // find open parenthesis
+      var startAt  = this._findParenthesis(token, -1),
           startCur = {},
-          source   = [];
+          source   = {};
       
+      // bracket char not found
       if(startAt === -1){
-         return;
+         return false;
       }
       
       startCur = {line: cursor.line, ch: startAt + 1};
-      token    = token.substring(0, startAt+1);
-      source   = this.dataHandler(token);
+      token    = token.substring(0, startAt + 1);
+      source   = dataFn(token);
       
       if(!source){
-         return;
+         return false;
       }
       
-      this.openHint(source.name, source.hintList, startCur, this._getToken(cursor, startCur));
+      return this.openHint(source.name, source.hintList, startCur, this._getToken(cursor, startCur));
    };
    
    /**
@@ -417,77 +362,78 @@ define(function (require, exports, module) {
    };
    
    /**
-    * Find first open parenthesis position from the end of string
+    * Find open or close parenthesis position
     *
     * @param {string} source - input text
+    * @param {number} dir    - search direction
     *
     * @return {number} position number or -1, if parenthesis not found
    */
-   ParameterHintManager.prototype._findBackParenthesis = function(source){
-      var exp   = /[()]/,
-          pos   = 0,
-          count = 0,
-          ch    = "";
+   ParameterHintManager.prototype._findParenthesis = function(source, dir){
+      var exp = /[()]/,
+          pos = 0,
+          end = 0;
       
-      var maxScanLen = 300;
+      var count      = 0,
+          crrChar    = "",
+          openChar   = "",
+          maxScanLen = 300;
       
+      // restrict search range
       if(source.length > maxScanLen){
-         source = source.substr(source.length - maxScanLen);
+         source = (dir === 1) ? source.substr(0, maxScanLen) : source.substr(source.length - maxScanLen);
       }
       
-      pos = source.length-1;
+      if(dir === 1){
+         // search forward
+         pos      = 0;
+         end      = source.length;
+         openChar = "(";
+      } else {
+         // search backward
+         pos      = source.length-1;
+         openChar = ")";
+         end = dir = -1;
+      }
       
-      while(pos !== -1){
-         ch = source.charAt(pos);
+      while(pos !== end){
+         crrChar = source.charAt(pos);
          
-         if(exp.test(ch)){
-            if(ch === ")") {
+         if(exp.test(crrChar)){
+            if(crrChar === openChar) {
                ++count;
             } else if (--count === -1) {
                return pos;
             }
          }
          
-         pos--;
+         pos += dir;
       }
       
       return -1;
    };
    
    /**
-    * Override current command handler by own function
-   */
-   ParameterHintManager.prototype.overrideCommands = function(){
-      if(!this.cmdReleased) return false;
-      crrCmdHandler._commandFn = this._handleShowParameterCmd.bind(this);
-      this.cmdReleased = false;
-   };
-   
-   /**
-    * Restore previous function which handles command
-   */
-   ParameterHintManager.prototype.releaseCommands = function(){
-      if(this.cmdReleased) return false;
-      crrCmdHandler._commandFn = crrCmdFunction;
-      this.cmdReleased = true;
-   };
-   
-   /**
     * Determines whether cursor is inside a function parentheses
     *
-    * @param {Object} cursor - current cursor
+    * @param {Object}  cursor - current cursor
+    * @param {boolean} force  - to force counting parentheses
+    * @param {string}  token  - fragment of code in range from start cursor pos to current cursor pos
     *
     * @return {boolean} false, if cursor is out of range
    */
-   ParameterHintManager.prototype._inParams = function(cursor){
-      // check cursor coordinates
-      if(cursor.line !== this.startCursor.line || cursor.ch < this.startCursor.ch) return false;
+   ParameterHintManager.prototype._inParams = function(cursor, force, token){
+      token = token || this.token;
       
-      // check, if cursor is behind a function call
-      if(this.token.substr(-1, 1) === ")" && this._findBackParenthesis(this.token.slice(0,-1)) === -1){
+      // check cursor coordinates
+      if(cursor.line !== this.startCursor.line) return false;
+      
+      // check, if cursor is in front of or behind a function call
+      if(cursor.ch < this.startCursor.ch || ((force || token.substr(-1, 1) === ")") && this._findParenthesis(token, 1) !== -1)){
          // is something stored in stack?
          if(this.hintStack.length > 0){
-            return this._restoreHintState(this.hintStack.pop());
+            this._restoreHintState(this.hintStack.pop());
+            return this._inParams(cursor, force, this.token + token);
          }
          
          return false;
@@ -500,8 +446,10 @@ define(function (require, exports, module) {
     * Add listeners which track user input and session
    */
    ParameterHintManager.prototype._addListeners = function(){
-      var cursorPos,
-          self = this;
+      var jumped    = false,
+          self      = this,
+          crrCursor = {},
+          oldCursor = {};
       
       this.editor.on("keydown.sassHints", function(e, editor, domEvent){
          if(domEvent.keyCode === KeyEvent.DOM_VK_ESCAPE){
@@ -513,10 +461,12 @@ define(function (require, exports, module) {
          }
       }).on("cursorActivity.sassHints", function(e){
          try{
-            cursorPos  = e.target.getCursorPos();
-            self.token = self._getToken(cursorPos);
+            oldCursor  = crrCursor || self.startCursor;
+            crrCursor  = e.target.getCursorPos();
+            jumped     = (crrCursor.ch - oldCursor.ch) > 1;
+            self.token = self._getToken(crrCursor);
 
-            if(self._inParams(cursorPos)){
+            if(self._inParams(crrCursor, jumped)){
                if(self.visible){
                   self._popupHint();
                }
@@ -527,6 +477,8 @@ define(function (require, exports, module) {
             console.log(err);
             self.closeHint();
          }
+      }).on("scroll.sassHints", function(){
+            self.closeHint();
       });
    };
    
@@ -550,6 +502,7 @@ define(function (require, exports, module) {
       this.editor.off("keydown.sassHints");
       this.editor.off("keypress.sassHints");
       this.editor.off("cursorActivity.sassHints");
+      this.editor.off("scroll.sassHints");
    };
    
    module.exports = ParameterHintManager;
