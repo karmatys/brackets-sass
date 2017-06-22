@@ -7,6 +7,14 @@ An extension for [Brackets](https://github.com/adobe/brackets/) to show SASS hin
 3. Click on the **Install** button.
 
 ### How to Use Extension
+- Keywords, Variables, Mixins
+  - Type **`$`** or **`@`** to show respectively variables or keywords hint
+  - Type **`@include `** to show mixins hint
+  - Press **`Ctrl+Space`** near the variable/mixin/keyword to show hint list
+- Functions, Parameters
+  - Press **`Ctrl+Shift+Space`** to show functions hint list. If cursor is between function parentheses, it shows parameters hint
+  
+### Support
 Currently only SCSS file format is supported.
 
 ### Extension Preferences
@@ -27,12 +35,21 @@ When we import files by *@import 'file'* the extension firstly looking for a fil
 
 For more information on setting preferences see [How to Use Brackets - Preferences](https://github.com/adobe/brackets/wiki/How-to-Use-Brackets#preferences)
 
-### Planned development
+### Screenshots
+![variables](screenshots/vars.png)
+*parameters and local / global variables example*
 
+![mixins](screenshots/mixins.gif)
+*keywords and mixins example*
+
+![functions](screenshots/functions.gif)
+*functions example*
+
+### Planned development
 1. Jump to definition
 
 ### License
 MIT-licensed -- see `main.js` for details.
 
 ### Compatibility
-Tested on Brackets Release 1.9 (Windows 7).
+Tested on Brackets 1.9 and 1.10 pre-release 2 (Windows 7).
