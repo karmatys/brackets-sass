@@ -36,13 +36,13 @@ When we import files by *@import 'file'* the extension firstly looking for a fil
 For more information on setting preferences see [How to Use Brackets - Preferences](https://github.com/adobe/brackets/wiki/How-to-Use-Brackets#preferences)
 
 ### Screenshots
-![variables](screenshots/vars.png)
+![variables](screenshots/vars.png)<br/>
 *parameters and local / global variables example*
 
-![mixins](screenshots/mixins.gif)
+![mixins](screenshots/mixins.gif)<br/>
 *keywords and mixins example*
 
-![functions](screenshots/functions.gif)
+![functions](screenshots/functions.gif)<br/>
 *functions example*
 
 ### Planned development
