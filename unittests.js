@@ -126,6 +126,12 @@ define(function (require, exports, module) {
        */
       function getHints(provider, key){
          key = key || null;
+         
+         if(key === ":"){
+            provider._handleFunctionCmd();
+            key = null;
+         }
+         
          expect(provider.hasHints(testEditor, key)).toBe(true);
          return provider.getHints(null).hints;
       }
@@ -213,7 +219,10 @@ define(function (require, exports, module) {
        * @param {string} activeItem - name of parameter that should be active
       */
       function expectParameters(provider, activeItem){
-         provider.parameterManager._handleShowParameterCmd();
+         provider.parameterManager.handleParametersCmd(function(token){
+            return provider.getHintDataByParameterToken(token);
+         });
+         
          expect(provider.parameterManager.isActive()).toBe(true);
          
          if(typeof activeItem !== "undefined"){
@@ -227,7 +236,9 @@ define(function (require, exports, module) {
        * @param {SassHint} provider - a CodeHintProvider object
       */
       function expectNoParameters(provider){
-         provider.parameterManager._handleShowParameterCmd();
+         provider.parameterManager.handleParametersCmd(function(token){
+            return provider.getHintDataByParameterToken(token);
+         });
          expect(provider.parameterManager.isActive()).toBe(false);
       }
       
@@ -368,7 +379,7 @@ define(function (require, exports, module) {
             testDocument.replaceRange(": pxto", {line: 8, ch: 0});
             insertText(": pxto", -3, 4);
             setCursorPos(-3, 10);
-            includeHints(SassHint.sassHintProvider, null, ["pxtoem"]);
+            includeHints(SassHint.sassHintProvider, ":", ["pxtoem"]);
          });
          
       });
@@ -556,12 +567,12 @@ define(function (require, exports, module) {
             expect(paramManager.isActive()).toBe(false);
          });
          
-         it("should dismiss second attempt to create parameters hint session, which was explicitly executed by command", function(){
+         it("should open function hint session, when command was executed second times", function(){
             setCursorPos(78, 16);
             expectParameters(SassHint.sassHintProvider);
             
-            // try to create second session after command
-            paramManager._handleShowParameterCmd();
+            // try to create second session
+            expect(getHints(SassHint.sassHintProvider, ":").length).toBeGreaterThan(0);
             
             // stack should be empty if second attempt was dimissed
             expect(paramManager.hintStack.length).toBe(0);
@@ -589,7 +600,7 @@ define(function (require, exports, module) {
             insertText("padding-left: ro", -2, 1);
             setCursorPos(-2, 17);
             
-            var hintList = getHints(SassHint.sassHintProvider, ""),
+            var hintList = getHints(SassHint.sassHintProvider, ":"),
                 hintItem = findHint(hintList, "round");
             
             expect(hintItem).not.toBeNull();
@@ -612,6 +623,19 @@ define(function (require, exports, module) {
             expect(paramManager.isActive()).toBe(true);
             expect(paramManager.hintStack.length).toBe(1);
             expect(paramManager.hintStack[0].name).toBe("round");
+         });
+         
+         it("should close parameters hint session, when cursor jump at the end of line (far from close parenthesis)", function(){
+            insertText("padding: sum(20, 20) ceil(5.3) 10 10;", -2, 1);
+            setCursorPos(-2, 14);
+            expectParameters(SassHint.sassHintProvider, "$a");
+            
+            expect(paramManager.isVisible()).toBe(true);
+            setCursorPos(-2, 38);
+            
+            // check session state
+            expect(paramManager.isActive()).toBe(false);
+            expect(paramManager.isVisible()).toBe(false);
          });
       });
    });

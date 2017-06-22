@@ -21,7 +21,7 @@
  *
  */
 
-/*jshint plusplus: false, devel: true, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
+/*jshint plusplus: false, devel: false, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true, boss:true */
 /*global define, brackets, $ */
 
 define(function (require, exports, module) {
@@ -240,6 +240,9 @@ define(function (require, exports, module) {
       if(showBuiltFns && !this.fnCache.length){
          this.fnCache = this.fnCache.concat(this.builtFns);
       }
+      
+      // scan current file in search of vars, mixins and functions declarations
+      this._updateAllHints(this.crrEditor.document.getText());
    };
    
    /**
@@ -261,7 +264,7 @@ define(function (require, exports, module) {
          // hint mode was changed in previous session
          if(this.crrHintMode !== null && this.newSession){
             this.cursorCache = this.cursorCache || cursor;
-            this._updateHints({line: -1}, this.crrHintMode);
+            this._updateHints(cursor, this.crrHintMode);
             this.newSession  = false;
             return true;
          }
@@ -699,7 +702,7 @@ define(function (require, exports, module) {
       if(cursor.line === this.cursorCache.line && this.lastHintMode === type){
          return;
       }
-      
+
       var source;
       
       switch(type){
@@ -727,6 +730,29 @@ define(function (require, exports, module) {
       }
       
       this.lastHintMode = type;
+   };
+   
+   /**
+    * Update all kind of hints from text given as argument
+    *
+    * @param {string} docText  source of code, which will be scanned
+   */
+   SassHint.prototype._updateAllHints = function(docText){
+      var hintResult = {};
+               
+      // remove comments
+      docText = docText.replace(this.commentRegExp, "");
+
+      // get functions from file
+      hintResult     = this._getFunctions(docText, null, true);
+      this.functions = this.fnCache.concat(hintResult.hints);
+
+      // get mixins from file
+      hintResult  = this._getMixins(hintResult.text, null, true);
+      this.mixins = this.mixCache.concat(hintResult.hints);
+
+      // get variables from file
+      this.vars = this.varCache.concat(this._getVariables(hintResult.text, null));
    };
    
    /**
@@ -1154,7 +1180,7 @@ define(function (require, exports, module) {
       // to show function hints for code hints.
       CommandManager.on("beforeExecuteCommand", function (event, commandId) {
          if (commandId !== SASS_FUNC_CMD_ID) {
-            self.closeHint();
+            self.parameterManager.closeHint();
          }
       });
    };

@@ -21,7 +21,7 @@
  *
  */
 
-/*jshint plusplus: false, devel: true, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true */
+/*jshint plusplus: false, devel: false, nomen: true, indent: 4, maxerr: 50, regexp: true, strict: true */
 /*global define, brackets, $ */
 
 define(function (require, exports, module) {
@@ -448,8 +448,8 @@ define(function (require, exports, module) {
    ParameterHintManager.prototype._addListeners = function(){
       var jumped    = false,
           self      = this,
-          crrCursor = {},
-          oldCursor = {};
+          crrCursor,
+          oldCursor;
       
       this.editor.on("keydown.sassHints", function(e, editor, domEvent){
          if(domEvent.keyCode === KeyEvent.DOM_VK_ESCAPE){
@@ -474,7 +474,7 @@ define(function (require, exports, module) {
                self.closeHint();
             }
          } catch(err){
-            console.log(err);
+            console.warn(err);
             self.closeHint();
          }
       }).on("scroll.sassHints", function(){
